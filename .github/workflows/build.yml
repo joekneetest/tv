@@ -15,26 +15,26 @@ jobs:
       - name: Write project files
         run: |
           mkdir -p $(dirname settings.gradle.kts)
-          cat > settings.gradle.kts <<'EOF_93956'
+          cat > settings.gradle.kts <<'END_OF_FILE_0'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositories { google(); mavenCentral() } }
           rootProject.name = "TvLauncher"
           include(":app")
-          EOF_93956
+          END_OF_FILE_0
           mkdir -p $(dirname build.gradle.kts)
-          cat > build.gradle.kts <<'EOF_55958'
+          cat > build.gradle.kts <<'END_OF_FILE_1'
           plugins {
               id("com.android.application") version "8.5.2" apply false
               id("org.jetbrains.kotlin.android") version "1.9.24" apply false
           }
-          EOF_55958
+          END_OF_FILE_1
           mkdir -p $(dirname gradle.properties)
-          cat > gradle.properties <<'EOF_27719'
+          cat > gradle.properties <<'END_OF_FILE_2'
           android.useAndroidX=true
           org.gradle.jvmargs=-Xmx2g
-          EOF_27719
+          END_OF_FILE_2
           mkdir -p $(dirname app/build.gradle.kts)
-          cat > app/build.gradle.kts <<'EOF_11513'
+          cat > app/build.gradle.kts <<'END_OF_FILE_3'
           plugins {
               id("com.android.application")
               id("org.jetbrains.kotlin.android")
@@ -55,10 +55,11 @@ jobs:
           }
           dependencies {
               implementation("androidx.recyclerview:recyclerview:1.3.2")
+              implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
           }
-          EOF_11513
+          END_OF_FILE_3
           mkdir -p $(dirname app/src/main/AndroidManifest.xml)
-          cat > app/src/main/AndroidManifest.xml <<'EOF_62021'
+          cat > app/src/main/AndroidManifest.xml <<'END_OF_FILE_4'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -74,6 +75,7 @@ jobs:
                       android:exported="true"
                       android:launchMode="singleTask"
                       android:stateNotNeeded="true"
+                      android:hardwareAccelerated="true"
                       android:screenOrientation="landscape">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
@@ -85,63 +87,256 @@ jobs:
                   </activity>
               </application>
           </manifest>
-          EOF_62021
+          END_OF_FILE_4
           mkdir -p $(dirname app/src/main/res/values/styles.xml)
-          cat > app/src/main/res/values/styles.xml <<'EOF_82951'
+          cat > app/src/main/res/values/styles.xml <<'END_OF_FILE_5'
           <resources>
               <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
                   <item name="android:windowBackground">@android:color/black</item>
                   <item name="android:windowFullscreen">true</item>
               </style>
           </resources>
-          EOF_82951
+          END_OF_FILE_5
           mkdir -p $(dirname app/src/main/res/drawable/ic_launcher.xml)
-          cat > app/src/main/res/drawable/ic_launcher.xml <<'EOF_40408'
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'END_OF_FILE_6'
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
               <path android:fillColor="#1B1530" android:pathData="M0,0h108v108h-108z"/>
               <path android:fillColor="#BB86FC" android:pathData="M34,34h18v18h-18z M56,34h18v18h-18z M34,56h18v18h-18z M56,56h18v18h-18z"/>
           </vector>
-          EOF_40408
+          END_OF_FILE_6
+          mkdir -p $(dirname app/src/main/java/com/example/tvlauncher/Themes.kt)
+          cat > app/src/main/java/com/example/tvlauncher/Themes.kt <<'END_OF_FILE_7'
+          package com.example.tvlauncher
+
+          data class Theme(
+              val name: String,
+              val bg1: Int, val bg2: Int,
+              val accent: Int, val surface: Int,
+              val blobA: Int, val blobB: Int
+          )
+
+          private fun c(v: Long) = v.toInt()
+
+          object Themes {
+              val all = listOf(
+                  Theme("Purple Night", c(0xFF0E0A1F), c(0xFF2A1B4D), c(0xFFBB86FC), c(0xFF241C3D), c(0xFF7C4DFF), c(0xFFE040FB)),
+                  Theme("Ocean", c(0xFF031A2B), c(0xFF063B5C), c(0xFF4FC3F7), c(0xFF0B2E47), c(0xFF0288D1), c(0xFF00E5FF)),
+                  Theme("Sunset", c(0xFF1F0A12), c(0xFF4A1A2C), c(0xFFFF8A65), c(0xFF35141F), c(0xFFFF5252), c(0xFFFFAB40)),
+                  Theme("Emerald", c(0xFF04160F), c(0xFF0B3A28), c(0xFF69F0AE), c(0xFF0F2A1E), c(0xFF00C853), c(0xFF1DE9B6)),
+                  Theme("Rose", c(0xFF1A0B16), c(0xFF45153A), c(0xFFFF80AB), c(0xFF301027), c(0xFFF50057), c(0xFFFF4081)),
+                  Theme("AMOLED", c(0xFF000000), c(0xFF0A0A0A), c(0xFFFFFFFF), c(0xFF1A1A1A), c(0xFF444444), c(0xFF777777))
+              )
+          }
+          END_OF_FILE_7
+          mkdir -p $(dirname app/src/main/java/com/example/tvlauncher/AnimatedBackground.kt)
+          cat > app/src/main/java/com/example/tvlauncher/AnimatedBackground.kt <<'END_OF_FILE_8'
+          package com.example.tvlauncher
+
+          import android.content.Context
+          import android.graphics.Canvas
+          import android.graphics.LinearGradient
+          import android.graphics.Matrix
+          import android.graphics.Paint
+          import android.graphics.Path
+          import android.graphics.RadialGradient
+          import android.graphics.Shader
+          import android.view.View
+          import kotlin.math.PI
+          import kotlin.math.cos
+          import kotlin.math.max
+          import kotlin.math.sin
+
+          enum class Bg(val label: String) {
+              AURORA("Aurora"), PARTICLES("Particles"), WAVES("Waves"), GRADIENT("Gradient"), BLACK("Black")
+          }
+
+          class AnimatedBackground(context: Context) : View(context) {
+
+              var theme: Theme = Themes.all[0]
+                  set(value) { field = value; rebuild() }
+              var style: Bg = Bg.AURORA
+                  set(value) { field = value; invalidate() }
+
+              private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val path = Path()
+              private val m = Matrix()
+              private var baseShader: LinearGradient? = null
+              private var blobA: RadialGradient? = null
+              private var blobB: RadialGradient? = null
+              private var blobR = 0f
+
+              private val n = 40
+              private val px = FloatArray(n)
+              private val py = FloatArray(n)
+              private val ps = FloatArray(n)
+              private val pr = FloatArray(n)
+              private val pa = IntArray(n)
+              private val rnd = java.util.Random(7)
+              private val t0 = System.nanoTime()
+              private var last = 0f
+
+              init {
+                  for (i in 0 until n) {
+                      px[i] = rnd.nextFloat(); py[i] = rnd.nextFloat()
+                      ps[i] = 0.02f + rnd.nextFloat() * 0.05f
+                      pr[i] = 2f + rnd.nextFloat() * 5f
+                      pa[i] = 50 + rnd.nextInt(120)
+                  }
+              }
+
+              private fun alpha(c: Int, a: Int) = (c and 0x00FFFFFF) or (a shl 24)
+
+              override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+                  super.onSizeChanged(w, h, ow, oh)
+                  rebuild()
+              }
+
+              private fun rebuild() {
+                  val w = width.toFloat()
+                  val h = height.toFloat()
+                  if (w == 0f || h == 0f) { invalidate(); return }
+                  baseShader = LinearGradient(0f, 0f, w, h, theme.bg1, theme.bg2, Shader.TileMode.CLAMP)
+                  blobR = max(w, h) * 0.5f
+                  blobA = RadialGradient(0f, 0f, blobR, alpha(theme.blobA, 0x99), alpha(theme.blobA, 0), Shader.TileMode.CLAMP)
+                  blobB = RadialGradient(0f, 0f, blobR, alpha(theme.blobB, 0x77), alpha(theme.blobB, 0), Shader.TileMode.CLAMP)
+                  invalidate()
+              }
+
+              private fun blob(c: Canvas, s: RadialGradient?, x: Float, y: Float) {
+                  if (s == null) return
+                  m.setTranslate(x, y)
+                  s.setLocalMatrix(m)
+                  paint.shader = s
+                  c.drawRect(x - blobR, y - blobR, x + blobR, y + blobR, paint)
+              }
+
+              override fun onDraw(c: Canvas) {
+                  val w = width.toFloat()
+                  val h = height.toFloat()
+                  if (w == 0f) return
+                  if (style == Bg.BLACK) { c.drawColor(0xFF000000.toInt()); return }
+
+                  val t = (System.nanoTime() - t0) / 1e9f
+                  paint.shader = baseShader
+                  c.drawRect(0f, 0f, w, h, paint)
+
+                  when (style) {
+                      Bg.AURORA -> {
+                          blob(c, blobA, w * (0.30f + 0.25f * sin(t * 0.35f)), h * (0.35f + 0.25f * cos(t * 0.27f)))
+                          blob(c, blobB, w * (0.70f + 0.22f * cos(t * 0.31f)), h * (0.65f + 0.22f * sin(t * 0.40f)))
+                      }
+                      Bg.PARTICLES -> {
+                          paint.shader = null
+                          val dt = (t - last).coerceIn(0f, 0.1f)
+                          last = t
+                          for (i in 0 until n) {
+                              py[i] -= ps[i] * dt
+                              if (py[i] < -0.05f) { py[i] = 1.05f; px[i] = rnd.nextFloat() }
+                              val x = (px[i] + 0.015f * sin(t * 0.6f + i)) * w
+                              paint.color = alpha(theme.accent, pa[i])
+                              c.drawCircle(x, py[i] * h, pr[i], paint)
+                          }
+                      }
+                      Bg.WAVES -> {
+                          paint.shader = null
+                          for (l in 0 until 3) {
+                              path.reset()
+                              path.moveTo(0f, h)
+                              val yb = h * (0.70f + 0.08f * l)
+                              val amp = h * (0.035f + 0.01f * l)
+                              val k = (2f * PI.toFloat()) / (w * (0.55f - 0.1f * l))
+                              var x = 0f
+                              while (x <= w + 24f) {
+                                  path.lineTo(x, yb + amp * sin(x * k + t * (0.6f + 0.25f * l) + l * 1.7f))
+                                  x += 24f
+                              }
+                              path.lineTo(w, h)
+                              path.close()
+                              paint.color = alpha(if (l % 2 == 0) theme.blobA else theme.accent, 55 + l * 20)
+                              c.drawPath(path, paint)
+                          }
+                      }
+                      else -> {}
+                  }
+                  paint.shader = null
+                  if (style != Bg.GRADIENT) postInvalidateOnAnimation()
+              }
+          }
+          END_OF_FILE_8
           mkdir -p $(dirname app/src/main/java/com/example/tvlauncher/MainActivity.kt)
-          cat > app/src/main/java/com/example/tvlauncher/MainActivity.kt <<'EOF_70763'
+          cat > app/src/main/java/com/example/tvlauncher/MainActivity.kt <<'END_OF_FILE_9'
           package com.example.tvlauncher
 
           import android.app.Activity
+          import android.content.ActivityNotFoundException
           import android.content.ComponentName
           import android.content.Intent
-          import android.content.pm.ResolveInfo
           import android.graphics.Color
           import android.graphics.Typeface
+          import android.graphics.drawable.Drawable
           import android.graphics.drawable.GradientDrawable
           import android.graphics.drawable.StateListDrawable
           import android.net.Uri
+          import android.os.Build
           import android.os.Bundle
           import android.os.Handler
           import android.os.Looper
           import android.provider.Settings
+          import android.text.TextUtils
           import android.view.Gravity
+          import android.view.KeyEvent
           import android.view.View
           import android.view.ViewGroup
+          import android.view.animation.AlphaAnimation
+          import android.view.animation.Animation
+          import android.view.animation.AnimationSet
+          import android.view.animation.DecelerateInterpolator
+          import android.view.animation.LayoutAnimationController
+          import android.view.animation.TranslateAnimation
           import android.widget.FrameLayout
           import android.widget.ImageView
           import android.widget.LinearLayout
           import android.widget.TextView
+          import androidx.dynamicanimation.animation.DynamicAnimation
+          import androidx.dynamicanimation.animation.SpringAnimation
+          import androidx.dynamicanimation.animation.SpringForce
           import androidx.recyclerview.widget.GridLayoutManager
           import androidx.recyclerview.widget.RecyclerView
           import java.text.SimpleDateFormat
           import java.util.Date
           import java.util.Locale
 
-          private const val ACCENT = 0xFFBB86FC.toInt()
-          private const val SURFACE = 0xFF241C3D.toInt()
+          private const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
+          private const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
+
+          class AppItem(
+              val label: String,
+              val pkg: String,
+              val cls: String,
+              val icon: Drawable,
+              val banner: Boolean
+          )
 
           class MainActivity : Activity() {
 
+              private val prefs by lazy { getSharedPreferences("launcher", MODE_PRIVATE) }
+              private var themeIndex = 0
+              private var theme = Themes.all[0]
+              private var bgStyle = Bg.AURORA
+
+              private lateinit var bg: AnimatedBackground
+              private lateinit var content: LinearLayout
               private lateinit var clock: TextView
               private lateinit var date: TextView
+              private lateinit var customize: TextView
               private lateinit var grid: RecyclerView
+              private lateinit var panel: LinearLayout
+              private val themeChips = mutableListOf<TextView>()
+              private val bgChips = mutableListOf<TextView>()
               private val adapter = AppAdapter()
+              private var firstLoad = true
+
               private val handler = Handler(Looper.getMainLooper())
               private val tick = object : Runnable {
                   override fun run() {
@@ -152,40 +347,213 @@ jobs:
                   }
               }
 
+              private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+              private fun spring(v: View, p: DynamicAnimation.ViewProperty, to: Float) {
+                  SpringAnimation(v, p).setSpring(SpringForce(to).setStiffness(500f).setDampingRatio(0.6f)).start()
+              }
+
+              private fun pill(fill: Int, stroke: Int, radius: Int = 22) = GradientDrawable().apply {
+                  cornerRadius = dp(radius).toFloat()
+                  setColor(fill)
+                  setStroke(dp(2), stroke)
+              }
+
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  val d = resources.displayMetrics.density
-                  fun dp(v: Int) = (v * d).toInt()
+                  requestHighRefresh()
 
-                  val root = LinearLayout(this).apply {
+                  themeIndex = prefs.getInt("theme", 0).coerceIn(0, Themes.all.size - 1)
+                  theme = Themes.all[themeIndex]
+                  bgStyle = try { Bg.valueOf(prefs.getString("bg", "AURORA") ?: "AURORA") } catch (e: Exception) { Bg.AURORA }
+
+                  val root = FrameLayout(this)
+                  bg = AnimatedBackground(this)
+                  root.addView(bg, FrameLayout.LayoutParams(MATCH, MATCH))
+
+                  content = LinearLayout(this).apply {
                       orientation = LinearLayout.VERTICAL
-                      setPadding(dp(56), dp(32), dp(56), 0)
-                      background = GradientDrawable(
-                          GradientDrawable.Orientation.TL_BR,
-                          intArrayOf(0xFF0E0A1F.toInt(), 0xFF2A1B4D.toInt())
-                      )
+                      setPadding(dp(56), dp(28), dp(56), 0)
                   }
-
                   val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
-                  clock = TextView(this).apply { textSize = 56f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-light", Typeface.NORMAL) }
-                  date = TextView(this).apply { textSize = 20f; setTextColor(0xFFB9ADD6.toInt()); setPadding(dp(20), 0, 0, dp(12)) }
-                  header.addView(clock); header.addView(date)
-                  root.addView(header)
+                  clock = TextView(this).apply {
+                      textSize = 56f
+                      typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+                  }
+                  date = TextView(this).apply { textSize = 20f; setPadding(dp(20), 0, 0, dp(12)) }
+                  val spacer = View(this)
+                  customize = TextView(this).apply {
+                      text = "Customize"
+                      textSize = 16f
+                      isFocusable = true
+                      isClickable = true
+                      gravity = Gravity.CENTER
+                      setPadding(dp(22), dp(10), dp(22), dp(10))
+                      setOnClickListener { openPanel() }
+                      setOnFocusChangeListener { v, f ->
+                          setTextColor(if (f) theme.bg1 else Color.WHITE)
+                          spring(v, DynamicAnimation.SCALE_X, if (f) 1.1f else 1f)
+                          spring(v, DynamicAnimation.SCALE_Y, if (f) 1.1f else 1f)
+                      }
+                  }
+                  header.addView(clock)
+                  header.addView(date)
+                  header.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
+                  header.addView(customize, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = dp(12) })
+                  content.addView(header)
 
                   grid = RecyclerView(this).apply {
                       layoutManager = GridLayoutManager(this@MainActivity, 5)
                       adapter = this@MainActivity.adapter
+                      itemAnimator = null
+                      setHasFixedSize(true)
+                      setItemViewCacheSize(20)
                       clipToPadding = false
                       clipChildren = false
-                      setPadding(0, dp(24), 0, dp(48))
+                      setPadding(dp(12), dp(24), dp(12), dp(48))
                   }
-                  root.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+                  content.addView(grid, LinearLayout.LayoutParams(MATCH, 0, 1f))
+                  root.addView(content, FrameLayout.LayoutParams(MATCH, MATCH))
+
+                  buildPanel()
+                  root.addView(panel, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
                   setContentView(root)
+                  applyTheme()
               }
+
+              private fun requestHighRefresh() {
+                  if (Build.VERSION.SDK_INT < 23) return
+                  try {
+                      @Suppress("DEPRECATION")
+                      val d = windowManager.defaultDisplay
+                      val cur = d.mode
+                      val best = d.supportedModes
+                          .filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
+                          .maxByOrNull { it.refreshRate } ?: return
+                      val lp = window.attributes
+                      lp.preferredDisplayModeId = best.modeId
+                      window.attributes = lp
+                  } catch (e: Exception) { }
+              }
+
+              // ---------- Customize panel ----------
+
+              private fun chip(label: String, onClick: () -> Unit): TextView = TextView(this).apply {
+                  text = label
+                  textSize = 16f
+                  isFocusable = true
+                  isClickable = true
+                  gravity = Gravity.CENTER
+                  setPadding(dp(18), dp(10), dp(18), dp(10))
+                  setOnClickListener { onClick() }
+                  setOnFocusChangeListener { v, f ->
+                      spring(v, DynamicAnimation.SCALE_X, if (f) 1.1f else 1f)
+                      spring(v, DynamicAnimation.SCALE_Y, if (f) 1.1f else 1f)
+                  }
+              }
+
+              private fun sectionTitle(t: String) = TextView(this).apply {
+                  text = t
+                  textSize = 14f
+                  setTextColor(Color.argb(170, 255, 255, 255))
+                  setPadding(dp(4), dp(12), 0, dp(10))
+              }
+
+              private fun buildPanel() {
+                  panel = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      visibility = View.GONE
+                      setPadding(dp(32), dp(20), dp(32), dp(28))
+                      background = GradientDrawable().apply {
+                          cornerRadius = dp(24).toFloat()
+                          setColor(0xEB0B0818.toInt())
+                      }
+                  }
+                  panel.addView(sectionTitle("THEME"))
+                  val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                  Themes.all.forEachIndexed { i, th ->
+                      val ch = chip(th.name) {
+                          themeIndex = i
+                          theme = th
+                          prefs.edit().putInt("theme", i).apply()
+                          applyTheme()
+                      }
+                      themeChips.add(ch)
+                      row1.addView(ch, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(10) })
+                  }
+                  panel.addView(row1)
+                  panel.addView(sectionTitle("BACKGROUND"))
+                  val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                  Bg.values().forEach { b ->
+                      val ch = chip(b.label) {
+                          bgStyle = b
+                          prefs.edit().putString("bg", b.name).apply()
+                          applyTheme()
+                      }
+                      bgChips.add(ch)
+                      row2.addView(ch, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(10) })
+                  }
+                  panel.addView(row2)
+              }
+
+              private fun styleChip(c: TextView, selected: Boolean) {
+                  c.isSelected = selected
+                  c.setTextColor(if (selected) theme.bg1 else Color.WHITE)
+                  c.background = StateListDrawable().apply {
+                      addState(intArrayOf(android.R.attr.state_focused, android.R.attr.state_selected), pill(theme.accent, Color.WHITE, 20))
+                      addState(intArrayOf(android.R.attr.state_focused), pill(theme.surface, Color.WHITE, 20))
+                      addState(intArrayOf(android.R.attr.state_selected), pill(theme.accent, theme.accent, 20))
+                      addState(intArrayOf(), pill(theme.surface, Color.argb(60, 255, 255, 255), 20))
+                  }
+              }
+
+              private fun refreshChips() {
+                  themeChips.forEachIndexed { i, c -> styleChip(c, i == themeIndex) }
+                  val all = Bg.values()
+                  bgChips.forEachIndexed { i, c -> styleChip(c, all[i] == bgStyle) }
+              }
+
+              private fun applyTheme() {
+                  bg.theme = theme
+                  bg.style = bgStyle
+                  clock.setTextColor(Color.WHITE)
+                  date.setTextColor(Color.argb(190, 255, 255, 255))
+                  customize.setTextColor(if (customize.isFocused) theme.bg1 else Color.WHITE)
+                  customize.background = StateListDrawable().apply {
+                      addState(intArrayOf(android.R.attr.state_focused), pill(theme.accent, Color.WHITE))
+                      addState(intArrayOf(), pill(theme.surface, theme.accent))
+                  }
+                  refreshChips()
+                  adapter.notifyDataSetChanged()
+              }
+
+              private fun openPanel() {
+                  if (panel.visibility == View.VISIBLE) return
+                  content.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                  panel.visibility = View.VISIBLE
+                  panel.alpha = 0f
+                  panel.scaleX = 0.92f
+                  panel.scaleY = 0.92f
+                  panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220)
+                      .setInterpolator(DecelerateInterpolator()).start()
+                  content.animate().alpha(0.25f).setDuration(220).start()
+                  panel.post { themeChips[themeIndex].requestFocus() }
+              }
+
+              private fun closePanel() {
+                  if (panel.visibility != View.VISIBLE) return
+                  panel.animate().alpha(0f).scaleX(0.95f).scaleY(0.95f).setDuration(160)
+                      .withEndAction { panel.visibility = View.GONE }.start()
+                  content.animate().alpha(1f).setDuration(200).start()
+                  content.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+                  customize.requestFocus()
+              }
+
+              // ---------- Lifecycle / keys ----------
 
               override fun onResume() {
                   super.onResume()
-                  adapter.submit(loadApps())
+                  reload()
                   handler.post(tick)
               }
 
@@ -196,102 +564,145 @@ jobs:
 
               override fun onNewIntent(intent: Intent?) {
                   super.onNewIntent(intent)
-                  grid.smoothScrollToPosition(0) // Home pressed again
+                  closePanel()
+                  grid.smoothScrollToPosition(0)
+              }
+
+              override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+                  if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_SETTINGS) {
+                      if (panel.visibility == View.VISIBLE) closePanel() else openPanel()
+                      return true
+                  }
+                  return super.onKeyDown(keyCode, event)
               }
 
               @Deprecated("Deprecated in Java")
-              override fun onBackPressed() { /* a launcher doesn't exit */ }
-
-              private fun loadApps(): List<ResolveInfo> {
-                  val pm = packageManager
-                  fun query(cat: String) = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(cat), 0)
-                  return (query(Intent.CATEGORY_LEANBACK_LAUNCHER) + query(Intent.CATEGORY_LAUNCHER))
-                      .filter { it.activityInfo.packageName != packageName }
-                      .distinctBy { it.activityInfo.packageName }
-                      .sortedBy { it.loadLabel(pm).toString().lowercase() }
+              override fun onBackPressed() {
+                  if (panel.visibility == View.VISIBLE) closePanel()
               }
 
-              private fun launch(ri: ResolveInfo) {
-                  val i = Intent(Intent.ACTION_MAIN).apply {
-                      component = ComponentName(ri.activityInfo.packageName, ri.activityInfo.name)
-                      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                  }
-                  startActivity(i)
+              // ---------- Apps ----------
+
+              private fun reload() {
+                  Thread {
+                      val pm = packageManager
+                      fun query(cat: String) = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(cat), 0)
+                      val list = (query(Intent.CATEGORY_LEANBACK_LAUNCHER) + query(Intent.CATEGORY_LAUNCHER))
+                          .filter { it.activityInfo.packageName != packageName }
+                          .distinctBy { it.activityInfo.packageName }
+                          .map {
+                              val banner = it.activityInfo.loadBanner(pm)
+                              AppItem(
+                                  it.loadLabel(pm).toString(),
+                                  it.activityInfo.packageName,
+                                  it.activityInfo.name,
+                                  banner ?: it.loadIcon(pm),
+                                  banner != null
+                              )
+                          }
+                          .sortedBy { it.label.lowercase() }
+                      runOnUiThread {
+                          if (list.map { it.pkg } != adapter.items.map { it.pkg }) {
+                              if (firstLoad) {
+                                  val a = AnimationSet(true).apply {
+                                      addAnimation(AlphaAnimation(0f, 1f))
+                                      addAnimation(TranslateAnimation(
+                                          Animation.RELATIVE_TO_SELF, 0f, Animation.RELATIVE_TO_SELF, 0f,
+                                          Animation.RELATIVE_TO_SELF, 0.3f, Animation.RELATIVE_TO_SELF, 0f))
+                                      duration = 450
+                                      interpolator = DecelerateInterpolator()
+                                  }
+                                  grid.layoutAnimation = LayoutAnimationController(a, 0.12f)
+                                  firstLoad = false
+                              }
+                              adapter.submit(list)
+                          }
+                      }
+                  }.start()
               }
 
-              private fun appInfo(ri: ResolveInfo) {
-                  startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ri.activityInfo.packageName}")))
+              private fun launch(a: AppItem) {
+                  try {
+                      startActivity(Intent(Intent.ACTION_MAIN).apply {
+                          component = ComponentName(a.pkg, a.cls)
+                          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                      })
+                      overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+                  } catch (e: ActivityNotFoundException) { }
+              }
+
+              private fun appInfo(a: AppItem) {
+                  startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${a.pkg}")))
               }
 
               inner class AppAdapter : RecyclerView.Adapter<AppAdapter.VH>() {
-                  private var items: List<ResolveInfo> = emptyList()
-                  fun submit(l: List<ResolveInfo>) { items = l; notifyDataSetChanged() }
+                  var items: List<AppItem> = emptyList()
+                      private set
 
-                  inner class VH(val card: LinearLayout, val img: ImageView, val label: TextView) : RecyclerView.ViewHolder(card)
+                  fun submit(l: List<AppItem>) { items = l; notifyDataSetChanged() }
+
+                  inner class VH(val card: LinearLayout, val box: FrameLayout, val img: ImageView, val label: TextView) :
+                      RecyclerView.ViewHolder(card)
 
                   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-                      val d = parent.resources.displayMetrics.density
-                      fun dp(v: Int) = (v * d).toInt()
-                      val card = LinearLayout(parent.context).apply {
+                      val ctx = parent.context
+                      val card = LinearLayout(ctx).apply {
                           orientation = LinearLayout.VERTICAL
                           isFocusable = true
                           isClickable = true
-                          layoutParams = ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                          layoutParams = ViewGroup.MarginLayoutParams(MATCH, WRAP).apply {
                               setMargins(dp(10), dp(10), dp(10), dp(10))
                           }
                           setPadding(dp(6), dp(6), dp(6), dp(6))
-                          background = StateListDrawable().apply {
-                              addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
-                                  cornerRadius = dp(16).toFloat(); setColor(SURFACE); setStroke(dp(3), ACCENT)
-                              })
-                              addState(intArrayOf(), GradientDrawable().apply {
-                                  cornerRadius = dp(16).toFloat(); setColor(0x00000000)
-                              })
-                          }
                       }
-                      val box = FrameLayout(parent.context).apply {
-                          background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(SURFACE) }
-                          clipToOutline = true
-                      }
-                      val img = ImageView(parent.context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-                      box.addView(img, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-                      card.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(110)))
-                      val label = TextView(parent.context).apply {
-                          textSize = 15f; setTextColor(Color.WHITE); maxLines = 1
-                          ellipsize = android.text.TextUtils.TruncateAt.END
-                          gravity = Gravity.CENTER; setPadding(0, dp(8), 0, dp(4))
+                      val box = FrameLayout(ctx).apply { clipToOutline = true }
+                      val img = ImageView(ctx)
+                      box.addView(img, FrameLayout.LayoutParams(MATCH, MATCH))
+                      card.addView(box, LinearLayout.LayoutParams(MATCH, dp(110)))
+                      val label = TextView(ctx).apply {
+                          textSize = 15f
+                          maxLines = 1
+                          ellipsize = TextUtils.TruncateAt.END
+                          gravity = Gravity.CENTER
+                          setPadding(0, dp(8), 0, dp(4))
                       }
                       card.addView(label)
-                      card.setOnFocusChangeListener { v, focus ->
-                          v.animate().scaleX(if (focus) 1.1f else 1f).scaleY(if (focus) 1.1f else 1f).setDuration(120).start()
-                          v.elevation = if (focus) 12 * d else 0f
+                      card.setOnFocusChangeListener { v, f ->
+                          val s = if (f) 1.12f else 1f
+                          spring(v, DynamicAnimation.SCALE_X, s)
+                          spring(v, DynamicAnimation.SCALE_Y, s)
+                          spring(v, DynamicAnimation.TRANSLATION_Y, if (f) -dp(6).toFloat() else 0f)
+                          label.setTextColor(if (f) theme.accent else Color.WHITE)
                       }
-                      return VH(card, img, label)
+                      return VH(card, box, img, label)
                   }
 
                   override fun onBindViewHolder(h: VH, pos: Int) {
-                      val ri = items[pos]
-                      val pm = packageManager
-                      val banner = ri.activityInfo.loadBanner(pm)
-                      if (banner != null) {
+                      val app = items[pos]
+                      h.card.background = StateListDrawable().apply {
+                          addState(intArrayOf(android.R.attr.state_focused), pill(theme.surface, theme.accent, 16))
+                          addState(intArrayOf(), GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(0) })
+                      }
+                      h.box.background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(theme.surface) }
+                      if (app.banner) {
                           h.img.scaleType = ImageView.ScaleType.CENTER_CROP
                           h.img.setPadding(0, 0, 0, 0)
-                          h.img.setImageDrawable(banner)
                       } else {
-                          val p = (28 * h.card.resources.displayMetrics.density).toInt()
+                          val p = dp(28)
                           h.img.scaleType = ImageView.ScaleType.FIT_CENTER
                           h.img.setPadding(p, p / 2, p, p / 2)
-                          h.img.setImageDrawable(ri.loadIcon(pm))
                       }
-                      h.label.text = ri.loadLabel(pm)
-                      h.card.setOnClickListener { launch(ri) }
-                      h.card.setOnLongClickListener { appInfo(ri); true }
+                      h.img.setImageDrawable(app.icon)
+                      h.label.text = app.label
+                      h.label.setTextColor(if (h.card.isFocused) theme.accent else Color.WHITE)
+                      h.card.setOnClickListener { launch(app) }
+                      h.card.setOnLongClickListener { appInfo(app); true }
                   }
 
                   override fun getItemCount() = items.size
               }
           }
-          EOF_70763
+          END_OF_FILE_9
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
