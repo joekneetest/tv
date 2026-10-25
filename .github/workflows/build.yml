@@ -1,0 +1,298 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Write project files
+        run: |
+          mkdir -p $(dirname settings.gradle.kts)
+          cat > settings.gradle.kts <<'EOF_93956'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
+          rootProject.name = "TvLauncher"
+          include(":app")
+          EOF_93956
+          mkdir -p $(dirname build.gradle.kts)
+          cat > build.gradle.kts <<'EOF_55958'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF_55958
+          mkdir -p $(dirname gradle.properties)
+          cat > gradle.properties <<'EOF_27719'
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2g
+          EOF_27719
+          mkdir -p $(dirname app/build.gradle.kts)
+          cat > app/build.gradle.kts <<'EOF_11513'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.example.tvlauncher"
+              compileSdk = 34
+              defaultConfig {
+                  applicationId = "com.example.tvlauncher"
+                  minSdk = 21
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+              buildTypes { release { isMinifyEnabled = false } }
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.recyclerview:recyclerview:1.3.2")
+          }
+          EOF_11513
+          mkdir -p $(dirname app/src/main/AndroidManifest.xml)
+          cat > app/src/main/AndroidManifest.xml <<'EOF_62021'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+              <uses-feature android:name="android.software.leanback" android:required="false" />
+              <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+              <application
+                  android:label="My Launcher"
+                  android:icon="@drawable/ic_launcher"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTask"
+                      android:stateNotNeeded="true"
+                      android:screenOrientation="landscape">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.HOME" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                          <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF_62021
+          mkdir -p $(dirname app/src/main/res/values/styles.xml)
+          cat > app/src/main/res/values/styles.xml <<'EOF_82951'
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+                  <item name="android:windowBackground">@android:color/black</item>
+                  <item name="android:windowFullscreen">true</item>
+              </style>
+          </resources>
+          EOF_82951
+          mkdir -p $(dirname app/src/main/res/drawable/ic_launcher.xml)
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'EOF_40408'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#1B1530" android:pathData="M0,0h108v108h-108z"/>
+              <path android:fillColor="#BB86FC" android:pathData="M34,34h18v18h-18z M56,34h18v18h-18z M34,56h18v18h-18z M56,56h18v18h-18z"/>
+          </vector>
+          EOF_40408
+          mkdir -p $(dirname app/src/main/java/com/example/tvlauncher/MainActivity.kt)
+          cat > app/src/main/java/com/example/tvlauncher/MainActivity.kt <<'EOF_70763'
+          package com.example.tvlauncher
+
+          import android.app.Activity
+          import android.content.ComponentName
+          import android.content.Intent
+          import android.content.pm.ResolveInfo
+          import android.graphics.Color
+          import android.graphics.Typeface
+          import android.graphics.drawable.GradientDrawable
+          import android.graphics.drawable.StateListDrawable
+          import android.net.Uri
+          import android.os.Bundle
+          import android.os.Handler
+          import android.os.Looper
+          import android.provider.Settings
+          import android.view.Gravity
+          import android.view.View
+          import android.view.ViewGroup
+          import android.widget.FrameLayout
+          import android.widget.ImageView
+          import android.widget.LinearLayout
+          import android.widget.TextView
+          import androidx.recyclerview.widget.GridLayoutManager
+          import androidx.recyclerview.widget.RecyclerView
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
+
+          private const val ACCENT = 0xFFBB86FC.toInt()
+          private const val SURFACE = 0xFF241C3D.toInt()
+
+          class MainActivity : Activity() {
+
+              private lateinit var clock: TextView
+              private lateinit var date: TextView
+              private lateinit var grid: RecyclerView
+              private val adapter = AppAdapter()
+              private val handler = Handler(Looper.getMainLooper())
+              private val tick = object : Runnable {
+                  override fun run() {
+                      val now = Date()
+                      clock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
+                      date.text = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(now)
+                      handler.postDelayed(this, 15_000)
+                  }
+              }
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  val d = resources.displayMetrics.density
+                  fun dp(v: Int) = (v * d).toInt()
+
+                  val root = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      setPadding(dp(56), dp(32), dp(56), 0)
+                      background = GradientDrawable(
+                          GradientDrawable.Orientation.TL_BR,
+                          intArrayOf(0xFF0E0A1F.toInt(), 0xFF2A1B4D.toInt())
+                      )
+                  }
+
+                  val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
+                  clock = TextView(this).apply { textSize = 56f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-light", Typeface.NORMAL) }
+                  date = TextView(this).apply { textSize = 20f; setTextColor(0xFFB9ADD6.toInt()); setPadding(dp(20), 0, 0, dp(12)) }
+                  header.addView(clock); header.addView(date)
+                  root.addView(header)
+
+                  grid = RecyclerView(this).apply {
+                      layoutManager = GridLayoutManager(this@MainActivity, 5)
+                      adapter = this@MainActivity.adapter
+                      clipToPadding = false
+                      clipChildren = false
+                      setPadding(0, dp(24), 0, dp(48))
+                  }
+                  root.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+                  setContentView(root)
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  adapter.submit(loadApps())
+                  handler.post(tick)
+              }
+
+              override fun onPause() {
+                  handler.removeCallbacks(tick)
+                  super.onPause()
+              }
+
+              override fun onNewIntent(intent: Intent?) {
+                  super.onNewIntent(intent)
+                  grid.smoothScrollToPosition(0) // Home pressed again
+              }
+
+              @Deprecated("Deprecated in Java")
+              override fun onBackPressed() { /* a launcher doesn't exit */ }
+
+              private fun loadApps(): List<ResolveInfo> {
+                  val pm = packageManager
+                  fun query(cat: String) = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(cat), 0)
+                  return (query(Intent.CATEGORY_LEANBACK_LAUNCHER) + query(Intent.CATEGORY_LAUNCHER))
+                      .filter { it.activityInfo.packageName != packageName }
+                      .distinctBy { it.activityInfo.packageName }
+                      .sortedBy { it.loadLabel(pm).toString().lowercase() }
+              }
+
+              private fun launch(ri: ResolveInfo) {
+                  val i = Intent(Intent.ACTION_MAIN).apply {
+                      component = ComponentName(ri.activityInfo.packageName, ri.activityInfo.name)
+                      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                  }
+                  startActivity(i)
+              }
+
+              private fun appInfo(ri: ResolveInfo) {
+                  startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ri.activityInfo.packageName}")))
+              }
+
+              inner class AppAdapter : RecyclerView.Adapter<AppAdapter.VH>() {
+                  private var items: List<ResolveInfo> = emptyList()
+                  fun submit(l: List<ResolveInfo>) { items = l; notifyDataSetChanged() }
+
+                  inner class VH(val card: LinearLayout, val img: ImageView, val label: TextView) : RecyclerView.ViewHolder(card)
+
+                  override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+                      val d = parent.resources.displayMetrics.density
+                      fun dp(v: Int) = (v * d).toInt()
+                      val card = LinearLayout(parent.context).apply {
+                          orientation = LinearLayout.VERTICAL
+                          isFocusable = true
+                          isClickable = true
+                          layoutParams = ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                              setMargins(dp(10), dp(10), dp(10), dp(10))
+                          }
+                          setPadding(dp(6), dp(6), dp(6), dp(6))
+                          background = StateListDrawable().apply {
+                              addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
+                                  cornerRadius = dp(16).toFloat(); setColor(SURFACE); setStroke(dp(3), ACCENT)
+                              })
+                              addState(intArrayOf(), GradientDrawable().apply {
+                                  cornerRadius = dp(16).toFloat(); setColor(0x00000000)
+                              })
+                          }
+                      }
+                      val box = FrameLayout(parent.context).apply {
+                          background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(SURFACE) }
+                          clipToOutline = true
+                      }
+                      val img = ImageView(parent.context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+                      box.addView(img, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                      card.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(110)))
+                      val label = TextView(parent.context).apply {
+                          textSize = 15f; setTextColor(Color.WHITE); maxLines = 1
+                          ellipsize = android.text.TextUtils.TruncateAt.END
+                          gravity = Gravity.CENTER; setPadding(0, dp(8), 0, dp(4))
+                      }
+                      card.addView(label)
+                      card.setOnFocusChangeListener { v, focus ->
+                          v.animate().scaleX(if (focus) 1.1f else 1f).scaleY(if (focus) 1.1f else 1f).setDuration(120).start()
+                          v.elevation = if (focus) 12 * d else 0f
+                      }
+                      return VH(card, img, label)
+                  }
+
+                  override fun onBindViewHolder(h: VH, pos: Int) {
+                      val ri = items[pos]
+                      val pm = packageManager
+                      val banner = ri.activityInfo.loadBanner(pm)
+                      if (banner != null) {
+                          h.img.scaleType = ImageView.ScaleType.CENTER_CROP
+                          h.img.setPadding(0, 0, 0, 0)
+                          h.img.setImageDrawable(banner)
+                      } else {
+                          val p = (28 * h.card.resources.displayMetrics.density).toInt()
+                          h.img.scaleType = ImageView.ScaleType.FIT_CENTER
+                          h.img.setPadding(p, p / 2, p, p / 2)
+                          h.img.setImageDrawable(ri.loadIcon(pm))
+                      }
+                      h.label.text = ri.loadLabel(pm)
+                      h.card.setOnClickListener { launch(ri) }
+                      h.card.setOnLongClickListener { appInfo(ri); true }
+                  }
+
+                  override fun getItemCount() = items.size
+              }
+          }
+          EOF_70763
+      - run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TvLauncher-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
