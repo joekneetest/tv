@@ -1,4 +1,4 @@
-name: Build APK
+name: Build MyTV APK
 on:
   push:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
           cat > settings.gradle.kts <<'END_OF_FILE_0'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositories { google(); mavenCentral() } }
-          rootProject.name = "TvLauncher"
+          rootProject.name = "MyTV"
           include(":app")
           END_OF_FILE_0
           mkdir -p $(dirname build.gradle.kts)
@@ -40,16 +40,27 @@ jobs:
               id("org.jetbrains.kotlin.android")
           }
           android {
-              namespace = "com.example.tvlauncher"
+              namespace = "com.mytv.launcher"
               compileSdk = 34
               defaultConfig {
-                  applicationId = "com.example.tvlauncher"
+                  applicationId = "com.mytv.launcher"
                   minSdk = 21
                   targetSdk = 34
                   versionCode = 1
                   versionName = "1.0"
               }
-              buildTypes { release { isMinifyEnabled = false } }
+              signingConfigs {
+                  create("mytv") {
+                      storeFile = file("mytv.jks")
+                      storePassword = "mytvlauncher"
+                      keyAlias = "mytv"
+                      keyPassword = "mytvlauncher"
+                  }
+              }
+              buildTypes {
+                  getByName("debug") { signingConfig = signingConfigs.getByName("mytv") }
+                  release { isMinifyEnabled = false }
+              }
               compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
           }
@@ -65,9 +76,10 @@ jobs:
               <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
               <uses-feature android:name="android.software.leanback" android:required="false" />
               <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
               <application
-                  android:label="My Launcher"
+                  android:label="MyTV"
                   android:icon="@drawable/ic_launcher"
                   android:theme="@style/AppTheme">
                   <activity
@@ -101,207 +113,535 @@ jobs:
           cat > app/src/main/res/drawable/ic_launcher.xml <<'END_OF_FILE_6'
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-              <path android:fillColor="#1B1530" android:pathData="M0,0h108v108h-108z"/>
-              <path android:fillColor="#BB86FC" android:pathData="M34,34h18v18h-18z M56,34h18v18h-18z M34,56h18v18h-18z M56,56h18v18h-18z"/>
+              <path android:fillColor="#07090D" android:pathData="M0,0h108v108h-108z"/>
+              <path android:fillColor="#4DA3FF" android:pathData="M30,70V38h8l16,20l16,-20h8v32h-8V52L54,72L38,52v18z"/>
           </vector>
           END_OF_FILE_6
-          mkdir -p $(dirname app/src/main/java/com/example/tvlauncher/Themes.kt)
-          cat > app/src/main/java/com/example/tvlauncher/Themes.kt <<'END_OF_FILE_7'
-          package com.example.tvlauncher
+          mkdir -p $(dirname app/mytv.jks.b64)
+          cat > app/mytv.jks.b64 <<'END_OF_FILE_7'
+          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
+          END_OF_FILE_7
+          mkdir -p $(dirname app/src/main/java/com/mytv/launcher/Config.kt)
+          cat > app/src/main/java/com/mytv/launcher/Config.kt <<'END_OF_FILE_8'
+          package com.mytv.launcher
 
-          data class Theme(
-              val name: String,
-              val bg1: Int, val bg2: Int,
-              val accent: Int, val surface: Int,
-              val blobA: Int, val blobB: Int
-          )
+          import android.content.Context
+          import android.content.SharedPreferences
 
-          private fun c(v: Long) = v.toInt()
-
-          object Themes {
-              val all = listOf(
-                  Theme("Purple Night", c(0xFF0E0A1F), c(0xFF2A1B4D), c(0xFFBB86FC), c(0xFF241C3D), c(0xFF7C4DFF), c(0xFFE040FB)),
-                  Theme("Ocean", c(0xFF031A2B), c(0xFF063B5C), c(0xFF4FC3F7), c(0xFF0B2E47), c(0xFF0288D1), c(0xFF00E5FF)),
-                  Theme("Sunset", c(0xFF1F0A12), c(0xFF4A1A2C), c(0xFFFF8A65), c(0xFF35141F), c(0xFFFF5252), c(0xFFFFAB40)),
-                  Theme("Emerald", c(0xFF04160F), c(0xFF0B3A28), c(0xFF69F0AE), c(0xFF0F2A1E), c(0xFF00C853), c(0xFF1DE9B6)),
-                  Theme("Rose", c(0xFF1A0B16), c(0xFF45153A), c(0xFFFF80AB), c(0xFF301027), c(0xFFF50057), c(0xFFFF4081)),
-                  Theme("AMOLED", c(0xFF000000), c(0xFF0A0A0A), c(0xFFFFFFFF), c(0xFF1A1A1A), c(0xFF444444), c(0xFF777777))
+          /** Apps offered by default. First installed package of each entry is pinned on first run. */
+          object Presets {
+              val apps: List<Pair<String, List<String>>> = listOf(
+                  "Spotify" to listOf("com.spotify.tv.android", "com.spotify.music"),
+                  "YouTube" to listOf("com.google.android.youtube.tv", "com.google.android.youtube"),
+                  "Netflix" to listOf("com.netflix.ninja", "com.netflix.mediaclient"),
+                  "Discord" to listOf("com.discord"),
+                  "Twitch" to listOf("tv.twitch.android.app", "tv.twitch.android.viewer"),
+                  "ChatGPT" to listOf("com.openai.chatgpt"),
+                  "Steam" to listOf("com.valvesoftware.steamlink", "com.valvesoftware.android.steam.community")
               )
           }
-          END_OF_FILE_7
-          mkdir -p $(dirname app/src/main/java/com/example/tvlauncher/AnimatedBackground.kt)
-          cat > app/src/main/java/com/example/tvlauncher/AnimatedBackground.kt <<'END_OF_FILE_8'
-          package com.example.tvlauncher
+
+          /** All user-changeable settings live here. */
+          class Config(ctx: Context) {
+              private val p: SharedPreferences = ctx.getSharedPreferences("mytv", Context.MODE_PRIVATE)
+
+              companion object {
+                  val ACCENT_NAMES = listOf("Blue", "White", "Teal", "Violet")
+                  val ACCENTS = listOf(0xFF4DA3FF.toInt(), 0xFFFFFFFF.toInt(), 0xFF2DD4BF.toInt(), 0xFF8B7CFF.toInt())
+                  val WALL_NAMES = listOf("Flow", "Deep", "Black")
+                  val SPEED_NAMES = listOf("Slow", "Normal", "Fast")
+                  val SPEEDS = listOf(0.5f, 1f, 1.7f)
+              }
+
+              var accentIndex: Int
+                  get() = p.getInt("accent", 0).coerceIn(0, ACCENTS.size - 1)
+                  set(v) { p.edit().putInt("accent", v).apply() }
+              var wall: Int
+                  get() = p.getInt("wall", 0).coerceIn(0, WALL_NAMES.size - 1)
+                  set(v) { p.edit().putInt("wall", v).apply() }
+              var speedIndex: Int
+                  get() = p.getInt("speed", 1).coerceIn(0, SPEEDS.size - 1)
+                  set(v) { p.edit().putInt("speed", v).apply() }
+              var clock12: Boolean
+                  get() = p.getBoolean("clock12", false)
+                  set(v) { p.edit().putBoolean("clock12", v).apply() }
+              var recentOn: Boolean
+                  get() = p.getBoolean("recent_on", true)
+                  set(v) { p.edit().putBoolean("recent_on", v).apply() }
+              var recentPkg: String?
+                  get() = p.getString("recent_pkg", null)
+                  set(v) { p.edit().putString("recent_pkg", v).apply() }
+              var recentTime: Long
+                  get() = p.getLong("recent_time", 0L)
+                  set(v) { p.edit().putLong("recent_time", v).apply() }
+              var pinned: List<String>?
+                  get() = p.getString("pinned", null)?.split(",")?.filter { it.isNotEmpty() }
+                  set(v) { p.edit().putString("pinned", v?.joinToString(",")).apply() }
+
+              val accent: Int get() = ACCENTS[accentIndex]
+              val speed: Float get() = SPEEDS[speedIndex]
+          }
+          END_OF_FILE_8
+          mkdir -p $(dirname app/src/main/java/com/mytv/launcher/FlowBackground.kt)
+          cat > app/src/main/java/com/mytv/launcher/FlowBackground.kt <<'END_OF_FILE_9'
+          package com.mytv.launcher
 
           import android.content.Context
           import android.graphics.Canvas
           import android.graphics.LinearGradient
-          import android.graphics.Matrix
           import android.graphics.Paint
           import android.graphics.Path
           import android.graphics.RadialGradient
           import android.graphics.Shader
           import android.view.View
-          import kotlin.math.PI
           import kotlin.math.cos
-          import kotlin.math.max
           import kotlin.math.sin
 
-          enum class Bg(val label: String) {
-              AURORA("Aurora"), PARTICLES("Particles"), WAVES("Waves"), GRADIENT("Gradient"), BLACK("Black")
-          }
+          /** Near-black wallpaper with thin, slowly drifting blue-gray curves. mode: 0 Flow, 1 Deep, 2 Black. */
+          class FlowBackground(ctx: Context) : View(ctx) {
 
-          class AnimatedBackground(context: Context) : View(context) {
+              var mode = 0
+                  set(v) { field = v; invalidate() }
+              var speed = 1f
 
-              var theme: Theme = Themes.all[0]
-                  set(value) { field = value; rebuild() }
-              var style: Bg = Bg.AURORA
-                  set(value) { field = value; invalidate() }
-
-              private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val glowFill = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+              private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
               private val path = Path()
-              private val m = Matrix()
               private var baseShader: LinearGradient? = null
-              private var blobA: RadialGradient? = null
-              private var blobB: RadialGradient? = null
-              private var blobR = 0f
-
-              private val n = 40
-              private val px = FloatArray(n)
-              private val py = FloatArray(n)
-              private val ps = FloatArray(n)
-              private val pr = FloatArray(n)
-              private val pa = IntArray(n)
-              private val rnd = java.util.Random(7)
-              private val t0 = System.nanoTime()
-              private var last = 0f
-
-              init {
-                  for (i in 0 until n) {
-                      px[i] = rnd.nextFloat(); py[i] = rnd.nextFloat()
-                      ps[i] = 0.02f + rnd.nextFloat() * 0.05f
-                      pr[i] = 2f + rnd.nextFloat() * 5f
-                      pa[i] = 50 + rnd.nextInt(120)
-                  }
-              }
-
-              private fun alpha(c: Int, a: Int) = (c and 0x00FFFFFF) or (a shl 24)
+              private var glowShaderA: RadialGradient? = null
+              private var glowShaderB: RadialGradient? = null
+              private var lineShader: LinearGradient? = null
+              private var tt = 0f
+              private var lastNs = 0L
 
               override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
                   super.onSizeChanged(w, h, ow, oh)
-                  rebuild()
-              }
-
-              private fun rebuild() {
-                  val w = width.toFloat()
-                  val h = height.toFloat()
-                  if (w == 0f || h == 0f) { invalidate(); return }
-                  baseShader = LinearGradient(0f, 0f, w, h, theme.bg1, theme.bg2, Shader.TileMode.CLAMP)
-                  blobR = max(w, h) * 0.5f
-                  blobA = RadialGradient(0f, 0f, blobR, alpha(theme.blobA, 0x99), alpha(theme.blobA, 0), Shader.TileMode.CLAMP)
-                  blobB = RadialGradient(0f, 0f, blobR, alpha(theme.blobB, 0x77), alpha(theme.blobB, 0), Shader.TileMode.CLAMP)
-                  invalidate()
-              }
-
-              private fun blob(c: Canvas, s: RadialGradient?, x: Float, y: Float) {
-                  if (s == null) return
-                  m.setTranslate(x, y)
-                  s.setLocalMatrix(m)
-                  paint.shader = s
-                  c.drawRect(x - blobR, y - blobR, x + blobR, y + blobR, paint)
+                  val fw = w.toFloat()
+                  val fh = h.toFloat()
+                  baseShader = LinearGradient(0f, 0f, 0f, fh, 0xFF04060A.toInt(), 0xFF090D16.toInt(), Shader.TileMode.CLAMP)
+                  glowShaderA = RadialGradient(fw * 0.88f, fh * 1.02f, fw * 0.62f, 0x401E4FA0, 0x00000000, Shader.TileMode.CLAMP)
+                  glowShaderB = RadialGradient(fw * 0.08f, fh * 0.05f, fw * 0.45f, 0x1A2A3A5A, 0x00000000, Shader.TileMode.CLAMP)
+                  lineShader = LinearGradient(
+                      0f, 0f, fw, 0f,
+                      intArrayOf(0x008FA6C4, 0xFF8FA6C4.toInt(), 0x008FA6C4),
+                      floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP
+                  )
               }
 
               override fun onDraw(c: Canvas) {
                   val w = width.toFloat()
                   val h = height.toFloat()
                   if (w == 0f) return
-                  if (style == Bg.BLACK) { c.drawColor(0xFF000000.toInt()); return }
+                  if (mode == 2) { c.drawColor(0xFF000000.toInt()); return }
 
-                  val t = (System.nanoTime() - t0) / 1e9f
-                  paint.shader = baseShader
-                  c.drawRect(0f, 0f, w, h, paint)
+                  val now = System.nanoTime()
+                  val dt = if (lastNs == 0L) 0f else ((now - lastNs) / 1e9f).coerceIn(0f, 0.1f)
+                  lastNs = now
+                  tt += dt * speed
 
-                  when (style) {
-                      Bg.AURORA -> {
-                          blob(c, blobA, w * (0.30f + 0.25f * sin(t * 0.35f)), h * (0.35f + 0.25f * cos(t * 0.27f)))
-                          blob(c, blobB, w * (0.70f + 0.22f * cos(t * 0.31f)), h * (0.65f + 0.22f * sin(t * 0.40f)))
+                  fill.shader = baseShader
+                  c.drawRect(0f, 0f, w, h, fill)
+                  glowFill.shader = glowShaderA
+                  c.drawRect(0f, 0f, w, h, glowFill)
+                  glowFill.shader = glowShaderB
+                  c.drawRect(0f, 0f, w, h, glowFill)
+
+                  if (mode == 0) {
+                      val u = w / 960f
+                      line.shader = lineShader
+                      halo.shader = lineShader
+                      for (i in 0 until 6) {
+                          val ph = tt * 0.18f + i * 0.85f
+                          val by = h * (0.28f + 0.09f * i)
+                          path.reset()
+                          path.moveTo(-0.05f * w, by + h * 0.06f * sin(ph))
+                          path.cubicTo(
+                              w * 0.30f, by - h * 0.30f + h * 0.10f * sin(ph * 0.8f + i),
+                              w * 0.66f, by + h * 0.32f + h * 0.10f * cos(ph * 0.7f),
+                              1.05f * w, by + h * 0.05f * sin(ph * 1.3f)
+                          )
+                          halo.strokeWidth = 5f * u
+                          halo.alpha = 12
+                          c.drawPath(path, halo)
+                          line.strokeWidth = 1.3f * u
+                          line.alpha = 40 + i * 12
+                          c.drawPath(path, line)
                       }
-                      Bg.PARTICLES -> {
-                          paint.shader = null
-                          val dt = (t - last).coerceIn(0f, 0.1f)
-                          last = t
-                          for (i in 0 until n) {
-                              py[i] -= ps[i] * dt
-                              if (py[i] < -0.05f) { py[i] = 1.05f; px[i] = rnd.nextFloat() }
-                              val x = (px[i] + 0.015f * sin(t * 0.6f + i)) * w
-                              paint.color = alpha(theme.accent, pa[i])
-                              c.drawCircle(x, py[i] * h, pr[i], paint)
-                          }
-                      }
-                      Bg.WAVES -> {
-                          paint.shader = null
-                          for (l in 0 until 3) {
-                              path.reset()
-                              path.moveTo(0f, h)
-                              val yb = h * (0.70f + 0.08f * l)
-                              val amp = h * (0.035f + 0.01f * l)
-                              val k = (2f * PI.toFloat()) / (w * (0.55f - 0.1f * l))
-                              var x = 0f
-                              while (x <= w + 24f) {
-                                  path.lineTo(x, yb + amp * sin(x * k + t * (0.6f + 0.25f * l) + l * 1.7f))
-                                  x += 24f
-                              }
-                              path.lineTo(w, h)
-                              path.close()
-                              paint.color = alpha(if (l % 2 == 0) theme.blobA else theme.accent, 55 + l * 20)
-                              c.drawPath(path, paint)
-                          }
-                      }
-                      else -> {}
+                      postInvalidateOnAnimation()
                   }
-                  paint.shader = null
-                  if (style != Bg.GRADIENT) postInvalidateOnAnimation()
               }
           }
-          END_OF_FILE_8
-          mkdir -p $(dirname app/src/main/java/com/example/tvlauncher/MainActivity.kt)
-          cat > app/src/main/java/com/example/tvlauncher/MainActivity.kt <<'END_OF_FILE_9'
-          package com.example.tvlauncher
+          END_OF_FILE_9
+          mkdir -p $(dirname app/src/main/java/com/mytv/launcher/Views.kt)
+          cat > app/src/main/java/com/mytv/launcher/Views.kt <<'END_OF_FILE_10'
+          package com.mytv.launcher
+
+          import android.animation.ValueAnimator
+          import android.content.Context
+          import android.graphics.Canvas
+          import android.graphics.LinearGradient
+          import android.graphics.Paint
+          import android.graphics.Rect
+          import android.graphics.RectF
+          import android.graphics.Shader
+          import android.graphics.Typeface
+          import android.graphics.drawable.Drawable
+          import android.text.TextPaint
+          import android.text.TextUtils
+          import android.view.View
+          import android.view.animation.DecelerateInterpolator
+          import androidx.dynamicanimation.animation.DynamicAnimation
+          import androidx.dynamicanimation.animation.SpringAnimation
+          import androidx.dynamicanimation.animation.SpringForce
+          import kotlin.math.cos
+          import kotlin.math.sin
+
+          fun blend(a: Int, b: Int, t: Float): Int {
+              fun ch(s: Int) = (((a shr s) and 0xFF) * (1f - t) + ((b shr s) and 0xFF) * t).toInt()
+              return (ch(24) shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+          }
+
+          fun withAlpha(c: Int, a: Int) = (c and 0x00FFFFFF) or (a.coerceIn(0, 255) shl 24)
+
+          private fun springTo(v: View, p: DynamicAnimation.ViewProperty, to: Float) {
+              SpringAnimation(v, p).setSpring(SpringForce(to).setStiffness(420f).setDampingRatio(0.75f)).start()
+          }
+
+          /** Rounded glass card with a focus animation (scale, thin accent outline, soft glow). */
+          abstract class GlassView(
+              ctx: Context,
+              protected val u: Float,
+              protected val cardW: Int,
+              protected val cardH: Int
+          ) : View(ctx) {
+
+              var accent: Int = 0xFF4DA3FF.toInt()
+                  set(v) { field = v; invalidate() }
+              var focusMs: Long = 180L
+
+              protected var p = 0f
+              protected val pad = (10 * u).toInt()
+              private val rect = RectF()
+              private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val shinePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+              private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+              private var shine: Shader? = null
+              protected var overlayShader: Shader? = null
+              private var anim: ValueAnimator? = null
+
+              init {
+                  isFocusable = true
+                  isClickable = true
+              }
+
+              override fun onMeasure(wSpec: Int, hSpec: Int) {
+                  setMeasuredDimension(cardW + 2 * pad, cardH + 2 * pad)
+              }
+
+              override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+                  super.onSizeChanged(w, h, ow, oh)
+                  shine = LinearGradient(0f, pad.toFloat(), 0f, pad + cardH * 0.65f, 0x2AFFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
+              }
+
+              override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+                  super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+                  val t = if (gainFocus) 1f else 0f
+                  anim?.cancel()
+                  anim = ValueAnimator.ofFloat(p, t).apply {
+                      duration = focusMs
+                      interpolator = DecelerateInterpolator()
+                      addUpdateListener { p = it.animatedValue as Float; invalidate() }
+                      start()
+                  }
+                  val s = 1f + 0.08f * t
+                  springTo(this, DynamicAnimation.SCALE_X, s)
+                  springTo(this, DynamicAnimation.SCALE_Y, s)
+              }
+
+              protected fun drawGlass(c: Canvas) {
+                  rect.set(pad.toFloat(), pad.toFloat(), (pad + cardW).toFloat(), (pad + cardH).toFloat())
+                  val r = 22f * u
+                  if (p > 0.01f) {
+                      for (k in 3 downTo 1) {
+                          glowPaint.color = withAlpha(accent, (40f * p / k).toInt())
+                          glowPaint.strokeWidth = k * 5f * u
+                          c.drawRoundRect(rect, r, r, glowPaint)
+                      }
+                  }
+                  fillPaint.color = blend(0xFF0E121A.toInt(), 0xFF1A2130.toInt(), p)
+                  c.drawRoundRect(rect, r, r, fillPaint)
+                  overlayShader?.let {
+                      overlayPaint.shader = it
+                      c.drawRoundRect(rect, r, r, overlayPaint)
+                  }
+                  shinePaint.shader = shine
+                  c.drawRoundRect(rect, r, r, shinePaint)
+                  borderPaint.color = blend(0x33FFFFFF, accent, p)
+                  borderPaint.strokeWidth = (1f + 1.4f * p) * u
+                  c.drawRoundRect(rect, r, r, borderPaint)
+              }
+          }
+
+          /** Wide app tile: icon only when idle; when focused the icon slides left and the name appears. */
+          class TileView(ctx: Context, u: Float) : GlassView(ctx, u, (180 * u).toInt(), (104 * u).toInt()) {
+
+              private val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                  typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                  color = 0xFFFFFFFF.toInt()
+                  textSize = 17f * u
+              }
+              private val plus = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  style = Paint.Style.STROKE
+                  strokeCap = Paint.Cap.ROUND
+                  color = 0xB3FFFFFF.toInt()
+              }
+              private var shown = ""
+
+              var icon: Drawable? = null
+                  set(v) { field = v; invalidate() }
+              var isAdd = false
+                  set(v) { field = v; invalidate() }
+              var label: String = ""
+                  set(v) {
+                      field = v
+                      val avail = cardW - (22f + 46f + 14f + 14f) * u
+                      shown = TextUtils.ellipsize(v, text, avail, TextUtils.TruncateAt.END).toString()
+                      invalidate()
+                  }
+
+              override fun onDraw(c: Canvas) {
+                  drawGlass(c)
+                  val sz = (46 * u).toInt()
+                  val cy = pad + cardH / 2
+                  val cx0 = pad + (cardW - sz) / 2
+                  val left = pad + (22 * u).toInt()
+                  val ix = (cx0 + (left - cx0) * p).toInt()
+                  val iy = cy - sz / 2
+                  if (isAdd) {
+                      plus.strokeWidth = 2.6f * u
+                      val a = sz * 0.30f
+                      val mx = ix + sz / 2f
+                      c.drawLine(mx - a, cy.toFloat(), mx + a, cy.toFloat(), plus)
+                      c.drawLine(mx, cy - a, mx, cy + a, plus)
+                  } else {
+                      icon?.let {
+                          it.setBounds(ix, iy, ix + sz, iy + sz)
+                          it.draw(c)
+                      }
+                  }
+                  if (p > 0.02f) {
+                      text.alpha = (255 * p).toInt()
+                      val tx = ix + sz + 14 * u
+                      c.drawText(shown, tx, cy - (text.ascent() + text.descent()) / 2f, text)
+                  }
+              }
+          }
+
+          /** The single recent-activity card: tinted thumbnail, big icon, title and "opened ... ago". */
+          class RecentCard(ctx: Context, u: Float) : GlassView(ctx, u, (262 * u).toInt(), (104 * u).toInt()) {
+
+              private val tagPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                  typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                  color = 0x8CFFFFFF.toInt()
+                  textSize = 11f * u
+                  letterSpacing = 0.14f
+              }
+              private val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                  typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                  color = 0xFFFFFFFF.toInt()
+                  textSize = 19f * u
+              }
+              private val metaPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                  typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                  color = 0x99FFFFFF.toInt()
+                  textSize = 13f * u
+              }
+              private var shownTitle = ""
+
+              var icon: Drawable? = null
+                  set(v) { field = v; invalidate() }
+              var meta: String = ""
+                  set(v) { field = v; invalidate() }
+              var title: String = ""
+                  set(v) {
+                      field = v
+                      val avail = cardW - (18f + 72f + 16f + 8f) * u
+                      shownTitle = TextUtils.ellipsize(v, titlePaint, avail, TextUtils.TruncateAt.END).toString()
+                      invalidate()
+                  }
+              var tint: Int = 0xFF2A4A7A.toInt()
+                  set(v) { field = v; rebuildOverlay(); invalidate() }
+
+              init { rebuildOverlay() }
+
+              private fun rebuildOverlay() {
+                  overlayShader = LinearGradient(
+                      (pad + cardW).toFloat(), pad.toFloat(), pad + cardW * 0.25f, (pad + cardH).toFloat(),
+                      intArrayOf(blend(tint, 0xFF000000.toInt(), 0.45f), 0xFF0A0D14.toInt()),
+                      null, Shader.TileMode.CLAMP
+                  )
+              }
+
+              override fun onDraw(c: Canvas) {
+                  drawGlass(c)
+                  val sz = (72 * u).toInt()
+                  val ix = pad + cardW - (16 * u).toInt() - sz
+                  val iy = pad + (cardH - sz) / 2
+                  icon?.let {
+                      it.setBounds(ix, iy, ix + sz, iy + sz)
+                      it.setAlpha(235)
+                      it.draw(c)
+                  }
+                  val x = pad + 18 * u
+                  c.drawText("RECENT", x, pad + 28 * u, tagPaint)
+                  c.drawText(shownTitle, x, pad + cardH - 38 * u, titlePaint)
+                  c.drawText(meta, x, pad + cardH - 17 * u, metaPaint)
+              }
+          }
+
+          /** Small drawn icons for the header. kind 0 = Wi-Fi, 1 = settings. */
+          class IconView(ctx: Context, private val kind: Int, private val u: Float, canFocus: Boolean) : View(ctx) {
+
+              var accent: Int = 0xFF4DA3FF.toInt()
+                  set(v) { field = v; invalidate() }
+              var dim = false
+                  set(v) { field = v; invalidate() }
+
+              private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+              private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val box = RectF()
+
+              init {
+                  isFocusable = canFocus
+                  isClickable = canFocus
+              }
+
+              override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+                  super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+                  val s = if (gainFocus) 1.12f else 1f
+                  springTo(this, DynamicAnimation.SCALE_X, s)
+                  springTo(this, DynamicAnimation.SCALE_Y, s)
+                  invalidate()
+              }
+
+              override fun onDraw(c: Canvas) {
+                  val w = width.toFloat()
+                  val cx = w / 2f
+                  val cy = height / 2f
+                  if (isFocused) {
+                      fill.color = 0x26FFFFFF
+                      c.drawCircle(cx, cy, w / 2f - u, fill)
+                      stroke.color = accent
+                      stroke.strokeWidth = 2f * u
+                      c.drawCircle(cx, cy, w / 2f - u, stroke)
+                  }
+                  val col = if (dim) 0x5AFFFFFF else 0xD2FFFFFF.toInt()
+                  stroke.color = col
+                  fill.color = col
+                  if (kind == 0) {
+                      stroke.strokeWidth = w * 0.075f
+                      val by = cy + w * 0.22f
+                      for (i in 1..3) {
+                          val r = i * w * 0.17f
+                          box.set(cx - r, by - r, cx + r, by + r)
+                          c.drawArc(box, 225f, 90f, false, stroke)
+                      }
+                      c.drawCircle(cx, by, w * 0.05f, fill)
+                  } else {
+                      stroke.strokeWidth = w * 0.07f
+                      c.drawCircle(cx, cy, w * 0.19f, stroke)
+                      stroke.strokeWidth = w * 0.09f
+                      for (a in 0 until 8) {
+                          val ang = Math.toRadians(a * 45.0)
+                          val ca = cos(ang).toFloat()
+                          val sa = sin(ang).toFloat()
+                          c.drawLine(cx + ca * w * 0.27f, cy + sa * w * 0.27f, cx + ca * w * 0.36f, cy + sa * w * 0.36f, stroke)
+                      }
+                  }
+              }
+          }
+          END_OF_FILE_10
+          mkdir -p $(dirname app/src/main/java/com/mytv/launcher/MainActivity.kt)
+          cat > app/src/main/java/com/mytv/launcher/MainActivity.kt <<'END_OF_FILE_11'
+          package com.mytv.launcher
 
           import android.app.Activity
           import android.content.ActivityNotFoundException
-          import android.content.ComponentName
           import android.content.Intent
+          import android.graphics.Bitmap
+          import android.graphics.Canvas
           import android.graphics.Color
           import android.graphics.Typeface
           import android.graphics.drawable.Drawable
           import android.graphics.drawable.GradientDrawable
           import android.graphics.drawable.StateListDrawable
+          import android.net.ConnectivityManager
+          import android.net.NetworkCapabilities
           import android.net.Uri
           import android.os.Build
           import android.os.Bundle
           import android.os.Handler
           import android.os.Looper
           import android.provider.Settings
-          import android.text.TextUtils
+          import android.util.TypedValue
           import android.view.Gravity
           import android.view.KeyEvent
           import android.view.View
           import android.view.ViewGroup
-          import android.view.animation.AlphaAnimation
-          import android.view.animation.Animation
-          import android.view.animation.AnimationSet
-          import android.view.animation.DecelerateInterpolator
-          import android.view.animation.LayoutAnimationController
-          import android.view.animation.TranslateAnimation
           import android.widget.FrameLayout
           import android.widget.ImageView
           import android.widget.LinearLayout
+          import android.widget.ScrollView
           import android.widget.TextView
-          import androidx.dynamicanimation.animation.DynamicAnimation
-          import androidx.dynamicanimation.animation.SpringAnimation
-          import androidx.dynamicanimation.animation.SpringForce
-          import androidx.recyclerview.widget.GridLayoutManager
+          import androidx.recyclerview.widget.LinearLayoutManager
           import androidx.recyclerview.widget.RecyclerView
           import java.text.SimpleDateFormat
           import java.util.Date
@@ -310,115 +650,150 @@ jobs:
           private const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
           private const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
 
-          class AppItem(
-              val label: String,
-              val pkg: String,
-              val cls: String,
-              val icon: Drawable,
-              val banner: Boolean
+          class AppEntry(val pkg: String, val label: String, val icon: Drawable)
+
+          /** One line in the settings / menu / picker overlay. */
+          class Row(
+              val title: String,
+              val icon: Drawable? = null,
+              val value: (() -> String)? = null,
+              val onLeft: (() -> Unit)? = null,
+              val onRight: (() -> Unit)? = null,
+              val onOk: () -> Unit
           )
 
           class MainActivity : Activity() {
 
-              private val prefs by lazy { getSharedPreferences("launcher", MODE_PRIVATE) }
-              private var themeIndex = 0
-              private var theme = Themes.all[0]
-              private var bgStyle = Bg.AURORA
+              private lateinit var cfg: Config
+              private var u = 1f
 
-              private lateinit var bg: AnimatedBackground
+              private lateinit var bg: FlowBackground
               private lateinit var content: LinearLayout
-              private lateinit var clock: TextView
-              private lateinit var date: TextView
-              private lateinit var customize: TextView
-              private lateinit var grid: RecyclerView
-              private lateinit var panel: LinearLayout
-              private val themeChips = mutableListOf<TextView>()
-              private val bgChips = mutableListOf<TextView>()
-              private val adapter = AppAdapter()
-              private var firstLoad = true
+              private lateinit var clockView: TextView
+              private lateinit var wifi: IconView
+              private lateinit var gear: IconView
+              private lateinit var tiles: RecyclerView
+              private lateinit var recent: RecentCard
+              private lateinit var overlay: FrameLayout
+              private lateinit var overlayTitle: TextView
+              private lateinit var overlayList: LinearLayout
+              private lateinit var scroll: ScrollView
+
+              private var apps: List<AppEntry> = emptyList()
+              private val adapter = TileAdapter()
+              private var overlayOpen = false
+              private var prevFocus: View? = null
+              private val valueViews = mutableListOf<Pair<Row, TextView>>()
+              private var firstFocusDone = false
 
               private val handler = Handler(Looper.getMainLooper())
               private val tick = object : Runnable {
                   override fun run() {
-                      val now = Date()
-                      clock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
-                      date.text = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(now)
+                      val fmt = if (cfg.clock12) "h:mm a" else "HH:mm"
+                      clockView.text = SimpleDateFormat(fmt, Locale.getDefault()).format(Date())
+                      wifi.dim = !online()
                       handler.postDelayed(this, 15_000)
                   }
               }
 
-              private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+              private fun f(v: Float) = v * u
+              private fun s(v: Int) = (v * u).toInt()
 
-              private fun spring(v: View, p: DynamicAnimation.ViewProperty, to: Float) {
-                  SpringAnimation(v, p).setSpring(SpringForce(to).setStiffness(500f).setDampingRatio(0.6f)).start()
-              }
-
-              private fun pill(fill: Int, stroke: Int, radius: Int = 22) = GradientDrawable().apply {
-                  cornerRadius = dp(radius).toFloat()
+              private fun roundRect(fill: Int, stroke: Int, radius: Int) = GradientDrawable().apply {
+                  cornerRadius = f(radius.toFloat())
                   setColor(fill)
-                  setStroke(dp(2), stroke)
+                  setStroke(s(2), stroke)
               }
+
+              private fun tv(t: String, size: Float, color: Int, face: String = "sans-serif"): TextView = TextView(this).apply {
+                  text = t
+                  setTextSize(TypedValue.COMPLEX_UNIT_PX, f(size))
+                  setTextColor(color)
+                  typeface = Typeface.create(face, Typeface.NORMAL)
+                  includeFontPadding = false
+              }
+
+              // ------------------------------------------------------------------ setup
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
+                  cfg = Config(this)
+                  u = resources.displayMetrics.widthPixels / 960f
                   requestHighRefresh()
 
-                  themeIndex = prefs.getInt("theme", 0).coerceIn(0, Themes.all.size - 1)
-                  theme = Themes.all[themeIndex]
-                  bgStyle = try { Bg.valueOf(prefs.getString("bg", "AURORA") ?: "AURORA") } catch (e: Exception) { Bg.AURORA }
-
                   val root = FrameLayout(this)
-                  bg = AnimatedBackground(this)
+                  bg = FlowBackground(this)
                   root.addView(bg, FrameLayout.LayoutParams(MATCH, MATCH))
 
-                  content = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      setPadding(dp(56), dp(28), dp(56), 0)
-                  }
-                  val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
-                  clock = TextView(this).apply {
-                      textSize = 56f
-                      typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-                  }
-                  date = TextView(this).apply { textSize = 20f; setPadding(dp(20), 0, 0, dp(12)) }
-                  val spacer = View(this)
-                  customize = TextView(this).apply {
-                      text = "Customize"
-                      textSize = 16f
-                      isFocusable = true
-                      isClickable = true
-                      gravity = Gravity.CENTER
-                      setPadding(dp(22), dp(10), dp(22), dp(10))
-                      setOnClickListener { openPanel() }
-                      setOnFocusChangeListener { v, f ->
-                          setTextColor(if (f) theme.bg1 else Color.WHITE)
-                          spring(v, DynamicAnimation.SCALE_X, if (f) 1.1f else 1f)
-                          spring(v, DynamicAnimation.SCALE_Y, if (f) 1.1f else 1f)
-                      }
-                  }
-                  header.addView(clock)
-                  header.addView(date)
-                  header.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
-                  header.addView(customize, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = dp(12) })
-                  content.addView(header)
+                  content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; clipChildren = false }
 
-                  grid = RecyclerView(this).apply {
-                      layoutManager = GridLayoutManager(this@MainActivity, 5)
+                  // Header: tiny logo left, time / wifi / settings right
+                  val header = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL
+                      gravity = Gravity.CENTER_VERTICAL
+                      setPadding(s(48), s(24), s(40), 0)
+                  }
+                  val logo = tv("MyTV", 22f, 0xEBFFFFFF.toInt(), "sans-serif-medium")
+                  logo.letterSpacing = 0.04f
+                  clockView = tv("", 19f, 0xE6FFFFFF.toInt(), "sans-serif-light")
+                  wifi = IconView(this, 0, u, false)
+                  gear = IconView(this, 1, u, true)
+                  gear.setOnClickListener { openSettings() }
+                  header.addView(logo)
+                  header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                  header.addView(clockView)
+                  header.addView(wifi, LinearLayout.LayoutParams(s(24), s(24)).apply { marginStart = s(20) })
+                  header.addView(gear, LinearLayout.LayoutParams(s(36), s(36)).apply { marginStart = s(14) })
+                  content.addView(header, LinearLayout.LayoutParams(MATCH, WRAP))
+
+                  // Center: single row of wide tiles + exactly one recent card on the right
+                  val center = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL
+                      gravity = Gravity.CENTER_VERTICAL
+                      clipChildren = false
+                      setPadding(s(38), 0, s(38), s(68))
+                  }
+                  tiles = RecyclerView(this).apply {
+                      layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
                       adapter = this@MainActivity.adapter
                       itemAnimator = null
-                      setHasFixedSize(true)
-                      setItemViewCacheSize(20)
                       clipToPadding = false
                       clipChildren = false
-                      setPadding(dp(12), dp(24), dp(12), dp(48))
+                      overScrollMode = View.OVER_SCROLL_NEVER
+                      setItemViewCacheSize(10)
                   }
-                  content.addView(grid, LinearLayout.LayoutParams(MATCH, 0, 1f))
+                  recent = RecentCard(this, u)
+                  recent.visibility = View.GONE
+                  recent.setOnClickListener { cfg.recentPkg?.let { launch(it) } }
+                  center.addView(tiles, LinearLayout.LayoutParams(0, WRAP, 1f))
+                  center.addView(recent, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = s(6) })
+                  content.addView(center, LinearLayout.LayoutParams(MATCH, 0, 1f))
                   root.addView(content, FrameLayout.LayoutParams(MATCH, MATCH))
 
-                  buildPanel()
-                  root.addView(panel, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
+                  buildOverlay(root)
                   setContentView(root)
-                  applyTheme()
+                  applyConfig()
+              }
+
+              private fun buildOverlay(root: FrameLayout) {
+                  overlay = FrameLayout(this).apply {
+                      visibility = View.GONE
+                      isClickable = true
+                      setBackgroundColor(0xB3000000.toInt())
+                  }
+                  val panel = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      setPadding(s(28), s(24), s(28), s(22))
+                      background = roundRect(0xF2101420.toInt(), 0x33FFFFFF, 26)
+                  }
+                  overlayTitle = tv("", 22f, Color.WHITE, "sans-serif-medium")
+                  panel.addView(overlayTitle, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = s(14) })
+                  scroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false }
+                  overlayList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                  scroll.addView(overlayList)
+                  panel.addView(scroll, LinearLayout.LayoutParams(MATCH, s(300)))
+                  overlay.addView(panel, FrameLayout.LayoutParams(s(560), WRAP, Gravity.CENTER))
+                  root.addView(overlay, FrameLayout.LayoutParams(MATCH, MATCH))
               }
 
               private fun requestHighRefresh() {
@@ -436,124 +811,25 @@ jobs:
                   } catch (e: Exception) { }
               }
 
-              // ---------- Customize panel ----------
-
-              private fun chip(label: String, onClick: () -> Unit): TextView = TextView(this).apply {
-                  text = label
-                  textSize = 16f
-                  isFocusable = true
-                  isClickable = true
-                  gravity = Gravity.CENTER
-                  setPadding(dp(18), dp(10), dp(18), dp(10))
-                  setOnClickListener { onClick() }
-                  setOnFocusChangeListener { v, f ->
-                      spring(v, DynamicAnimation.SCALE_X, if (f) 1.1f else 1f)
-                      spring(v, DynamicAnimation.SCALE_Y, if (f) 1.1f else 1f)
-                  }
-              }
-
-              private fun sectionTitle(t: String) = TextView(this).apply {
-                  text = t
-                  textSize = 14f
-                  setTextColor(Color.argb(170, 255, 255, 255))
-                  setPadding(dp(4), dp(12), 0, dp(10))
-              }
-
-              private fun buildPanel() {
-                  panel = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      visibility = View.GONE
-                      setPadding(dp(32), dp(20), dp(32), dp(28))
-                      background = GradientDrawable().apply {
-                          cornerRadius = dp(24).toFloat()
-                          setColor(0xEB0B0818.toInt())
-                      }
-                  }
-                  panel.addView(sectionTitle("THEME"))
-                  val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-                  Themes.all.forEachIndexed { i, th ->
-                      val ch = chip(th.name) {
-                          themeIndex = i
-                          theme = th
-                          prefs.edit().putInt("theme", i).apply()
-                          applyTheme()
-                      }
-                      themeChips.add(ch)
-                      row1.addView(ch, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(10) })
-                  }
-                  panel.addView(row1)
-                  panel.addView(sectionTitle("BACKGROUND"))
-                  val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-                  Bg.values().forEach { b ->
-                      val ch = chip(b.label) {
-                          bgStyle = b
-                          prefs.edit().putString("bg", b.name).apply()
-                          applyTheme()
-                      }
-                      bgChips.add(ch)
-                      row2.addView(ch, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(10) })
-                  }
-                  panel.addView(row2)
-              }
-
-              private fun styleChip(c: TextView, selected: Boolean) {
-                  c.isSelected = selected
-                  c.setTextColor(if (selected) theme.bg1 else Color.WHITE)
-                  c.background = StateListDrawable().apply {
-                      addState(intArrayOf(android.R.attr.state_focused, android.R.attr.state_selected), pill(theme.accent, Color.WHITE, 20))
-                      addState(intArrayOf(android.R.attr.state_focused), pill(theme.surface, Color.WHITE, 20))
-                      addState(intArrayOf(android.R.attr.state_selected), pill(theme.accent, theme.accent, 20))
-                      addState(intArrayOf(), pill(theme.surface, Color.argb(60, 255, 255, 255), 20))
-                  }
-              }
-
-              private fun refreshChips() {
-                  themeChips.forEachIndexed { i, c -> styleChip(c, i == themeIndex) }
-                  val all = Bg.values()
-                  bgChips.forEachIndexed { i, c -> styleChip(c, all[i] == bgStyle) }
-              }
-
-              private fun applyTheme() {
-                  bg.theme = theme
-                  bg.style = bgStyle
-                  clock.setTextColor(Color.WHITE)
-                  date.setTextColor(Color.argb(190, 255, 255, 255))
-                  customize.setTextColor(if (customize.isFocused) theme.bg1 else Color.WHITE)
-                  customize.background = StateListDrawable().apply {
-                      addState(intArrayOf(android.R.attr.state_focused), pill(theme.accent, Color.WHITE))
-                      addState(intArrayOf(), pill(theme.surface, theme.accent))
-                  }
-                  refreshChips()
+              /** Pushes the current settings into every view. */
+              private fun applyConfig() {
+                  bg.mode = cfg.wall
+                  bg.speed = cfg.speed
+                  recent.accent = cfg.accent
+                  gear.accent = cfg.accent
                   adapter.notifyDataSetChanged()
+                  updateRecent()
+                  handler.removeCallbacks(tick)
+                  handler.post(tick)
               }
 
-              private fun openPanel() {
-                  if (panel.visibility == View.VISIBLE) return
-                  content.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-                  panel.visibility = View.VISIBLE
-                  panel.alpha = 0f
-                  panel.scaleX = 0.92f
-                  panel.scaleY = 0.92f
-                  panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220)
-                      .setInterpolator(DecelerateInterpolator()).start()
-                  content.animate().alpha(0.25f).setDuration(220).start()
-                  panel.post { themeChips[themeIndex].requestFocus() }
-              }
-
-              private fun closePanel() {
-                  if (panel.visibility != View.VISIBLE) return
-                  panel.animate().alpha(0f).scaleX(0.95f).scaleY(0.95f).setDuration(160)
-                      .withEndAction { panel.visibility = View.GONE }.start()
-                  content.animate().alpha(1f).setDuration(200).start()
-                  content.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-                  customize.requestFocus()
-              }
-
-              // ---------- Lifecycle / keys ----------
+              // ------------------------------------------------------------------ lifecycle
 
               override fun onResume() {
                   super.onResume()
-                  reload()
+                  loadApps(false)
+                  updateRecent()
+                  handler.removeCallbacks(tick)
                   handler.post(tick)
               }
 
@@ -564,147 +840,333 @@ jobs:
 
               override fun onNewIntent(intent: Intent?) {
                   super.onNewIntent(intent)
-                  closePanel()
-                  grid.smoothScrollToPosition(0)
+                  closeOverlay()
+                  focusTile(0)
               }
 
               override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-                  if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_SETTINGS) {
-                      if (panel.visibility == View.VISIBLE) closePanel() else openPanel()
-                      return true
+                  when (keyCode) {
+                      KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> {
+                          if (overlayOpen) closeOverlay() else openSettings()
+                          return true
+                      }
+                      KeyEvent.KEYCODE_ESCAPE -> {
+                          if (overlayOpen) closeOverlay()
+                          return true
+                      }
                   }
                   return super.onKeyDown(keyCode, event)
               }
 
               @Deprecated("Deprecated in Java")
               override fun onBackPressed() {
-                  if (panel.visibility == View.VISIBLE) closePanel()
+                  if (overlayOpen) closeOverlay()
               }
 
-              // ---------- Apps ----------
+              // ------------------------------------------------------------------ apps
 
-              private fun reload() {
+              private fun canLaunch(pkg: String): Boolean {
+                  val pm = packageManager
+                  return pm.getLeanbackLaunchIntentForPackage(pkg) != null || pm.getLaunchIntentForPackage(pkg) != null
+              }
+
+              private fun loadApps(force: Boolean) {
                   Thread {
                       val pm = packageManager
-                      fun query(cat: String) = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(cat), 0)
-                      val list = (query(Intent.CATEGORY_LEANBACK_LAUNCHER) + query(Intent.CATEGORY_LAUNCHER))
-                          .filter { it.activityInfo.packageName != packageName }
-                          .distinctBy { it.activityInfo.packageName }
-                          .map {
-                              val banner = it.activityInfo.loadBanner(pm)
-                              AppItem(
-                                  it.loadLabel(pm).toString(),
-                                  it.activityInfo.packageName,
-                                  it.activityInfo.name,
-                                  banner ?: it.loadIcon(pm),
-                                  banner != null
-                              )
-                          }
-                          .sortedBy { it.label.lowercase() }
+                      val pins = cfg.pinned ?: Presets.apps
+                          .mapNotNull { (_, cands) -> cands.firstOrNull { canLaunch(it) } }
+                          .also { cfg.pinned = it }
+                      val list = pins.mapNotNull { pkg ->
+                          try {
+                              AppEntry(pkg, pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString(), pm.getApplicationIcon(pkg))
+                          } catch (e: Exception) { null }
+                      }
                       runOnUiThread {
-                          if (list.map { it.pkg } != adapter.items.map { it.pkg }) {
-                              if (firstLoad) {
-                                  val a = AnimationSet(true).apply {
-                                      addAnimation(AlphaAnimation(0f, 1f))
-                                      addAnimation(TranslateAnimation(
-                                          Animation.RELATIVE_TO_SELF, 0f, Animation.RELATIVE_TO_SELF, 0f,
-                                          Animation.RELATIVE_TO_SELF, 0.3f, Animation.RELATIVE_TO_SELF, 0f))
-                                      duration = 450
-                                      interpolator = DecelerateInterpolator()
-                                  }
-                                  grid.layoutAnimation = LayoutAnimationController(a, 0.12f)
-                                  firstLoad = false
-                              }
-                              adapter.submit(list)
+                          if (force || list.map { it.pkg } != apps.map { it.pkg }) {
+                              apps = list
+                              adapter.notifyDataSetChanged()
+                          }
+                          if (!firstFocusDone) {
+                              firstFocusDone = true
+                              focusTile(0)
                           }
                       }
                   }.start()
               }
 
-              private fun launch(a: AppItem) {
+              private fun savePins() { cfg.pinned = apps.map { it.pkg } }
+
+              private fun focusTile(idx: Int) {
+                  val i = idx.coerceIn(0, apps.size)
+                  tiles.scrollToPosition(i)
+                  tiles.postDelayed({ tiles.findViewHolderForAdapterPosition(i)?.itemView?.requestFocus() }, 80)
+              }
+
+              private fun launch(pkg: String) {
+                  val pm = packageManager
+                  val i = pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg) ?: return
+                  i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                   try {
-                      startActivity(Intent(Intent.ACTION_MAIN).apply {
-                          component = ComponentName(a.pkg, a.cls)
-                          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                      })
+                      startActivity(i)
+                      cfg.recentPkg = pkg
+                      cfg.recentTime = System.currentTimeMillis()
                       overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
                   } catch (e: ActivityNotFoundException) { }
               }
 
-              private fun appInfo(a: AppItem) {
-                  startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${a.pkg}")))
+              private fun appMenu(i: Int) {
+                  val a = apps.getOrNull(i) ?: return
+                  showOverlay(a.label, listOf(
+                      Row("Move left") { move(i, -1) },
+                      Row("Move right") { move(i, 1) },
+                      Row("Remove") { remove(i) },
+                      Row("App info") {
+                          closeOverlay()
+                          startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${a.pkg}")))
+                      }
+                  ))
               }
 
-              inner class AppAdapter : RecyclerView.Adapter<AppAdapter.VH>() {
-                  var items: List<AppItem> = emptyList()
-                      private set
+              private fun move(i: Int, d: Int) {
+                  val j = i + d
+                  if (j < 0 || j >= apps.size) { closeOverlay(); return }
+                  val m = apps.toMutableList()
+                  val t = m[i]; m[i] = m[j]; m[j] = t
+                  apps = m
+                  savePins()
+                  adapter.notifyDataSetChanged()
+                  closeOverlay()
+                  focusTile(j)
+              }
 
-                  fun submit(l: List<AppItem>) { items = l; notifyDataSetChanged() }
+              private fun remove(i: Int) {
+                  apps = apps.filterIndexed { k, _ -> k != i }
+                  savePins()
+                  adapter.notifyDataSetChanged()
+                  closeOverlay()
+                  focusTile(i)
+              }
 
-                  inner class VH(val card: LinearLayout, val box: FrameLayout, val img: ImageView, val label: TextView) :
-                      RecyclerView.ViewHolder(card)
+              private fun openPicker() {
+                  Thread {
+                      val pm = packageManager
+                      fun q(cat: String) = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(cat), 0)
+                      val pinned = apps.map { it.pkg }.toSet()
+                      val rows = (q(Intent.CATEGORY_LEANBACK_LAUNCHER) + q(Intent.CATEGORY_LAUNCHER))
+                          .map { it.activityInfo.packageName }
+                          .distinct()
+                          .filter { it != packageName && it !in pinned }
+                          .mapNotNull { pkg ->
+                              try {
+                                  AppEntry(pkg, pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString(), pm.getApplicationIcon(pkg))
+                              } catch (e: Exception) { null }
+                          }
+                          .sortedBy { it.label.lowercase() }
+                          .map { e ->
+                              Row(e.label, icon = e.icon) {
+                                  apps = apps + e
+                                  savePins()
+                                  adapter.notifyDataSetChanged()
+                                  closeOverlay()
+                                  focusTile(apps.size - 1)
+                              }
+                          }
+                      runOnUiThread { showOverlay("Add app", rows) }
+                  }.start()
+              }
+
+              // ------------------------------------------------------------------ recent card
+
+              private fun ago(t: Long): String {
+                  val m = (System.currentTimeMillis() - t) / 60000
+                  return when {
+                      m < 1 -> "just now"
+                      m < 60 -> "${m}m ago"
+                      m < 1440 -> "${m / 60}h ago"
+                      else -> "${m / 1440}d ago"
+                  }
+              }
+
+              private fun avgColor(d: Drawable): Int {
+                  val b = Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
+                  d.setBounds(0, 0, 16, 16)
+                  d.draw(Canvas(b))
+                  var r = 0L; var g = 0L; var bl = 0L; var n = 0L
+                  for (y in 0 until 16) for (x in 0 until 16) {
+                      val c = b.getPixel(x, y)
+                      if (Color.alpha(c) > 40) { r += Color.red(c); g += Color.green(c); bl += Color.blue(c); n++ }
+                  }
+                  b.recycle()
+                  return if (n == 0L) 0xFF2A4A7A.toInt() else Color.rgb((r / n).toInt(), (g / n).toInt(), (bl / n).toInt())
+              }
+
+              private fun updateRecent() {
+                  val pkg = cfg.recentPkg
+                  if (!cfg.recentOn || pkg == null) { recent.visibility = View.GONE; return }
+                  try {
+                      val pm = packageManager
+                      val icon = pm.getApplicationIcon(pkg)
+                      recent.title = pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+                      recent.meta = "Opened " + ago(cfg.recentTime)
+                      recent.tint = avgColor(icon)
+                      recent.icon = pm.getApplicationIcon(pkg)
+                      recent.visibility = View.VISIBLE
+                  } catch (e: Exception) {
+                      recent.visibility = View.GONE
+                  }
+              }
+
+              private fun online(): Boolean = try {
+                  val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+                  if (Build.VERSION.SDK_INT >= 23) {
+                      val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                      caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                  } else {
+                      cm.activeNetworkInfo?.isConnected == true
+                  }
+              } catch (e: Exception) { true }
+
+              // ------------------------------------------------------------------ overlay (settings, menus, picker)
+
+              private fun choice(title: String, names: List<String>, get: () -> Int, set: (Int) -> Unit): Row {
+                  val n = names.size
+                  fun step(d: Int) { set((get() + d + n) % n); applyConfig() }
+                  return Row(title, value = { names[get()] }, onLeft = { step(-1) }, onRight = { step(1) }, onOk = { step(1) })
+              }
+
+              private fun openSettings() {
+                  showOverlay("Settings", listOf(
+                      choice("Wallpaper", Config.WALL_NAMES, { cfg.wall }, { cfg.wall = it }),
+                      choice("Accent color", Config.ACCENT_NAMES, { cfg.accentIndex }, { cfg.accentIndex = it }),
+                      choice("Animation speed", Config.SPEED_NAMES, { cfg.speedIndex }, { cfg.speedIndex = it }),
+                      choice("Clock", listOf("24-hour", "12-hour"), { if (cfg.clock12) 1 else 0 }, { cfg.clock12 = it == 1 }),
+                      choice("Recent activity", listOf("Show", "Hide"), { if (cfg.recentOn) 0 else 1 }, { cfg.recentOn = it == 0 }),
+                      Row("Reset apps to default") {
+                          cfg.pinned = null
+                          closeOverlay()
+                          loadApps(true)
+                      }
+                  ))
+              }
+
+              private fun buildRow(row: Row): View {
+                  val v = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL
+                      gravity = Gravity.CENTER_VERTICAL
+                      isFocusable = true
+                      isClickable = true
+                      setPadding(s(18), s(12), s(18), s(12))
+                      background = StateListDrawable().apply {
+                          addState(intArrayOf(android.R.attr.state_focused), roundRect(0x26FFFFFF, cfg.accent, 14))
+                          addState(intArrayOf(), roundRect(0x00000000, 0x00000000, 14))
+                      }
+                  }
+                  row.icon?.let {
+                      val iv = ImageView(this)
+                      iv.setImageDrawable(it)
+                      v.addView(iv, LinearLayout.LayoutParams(s(34), s(34)).apply { marginEnd = s(16) })
+                  }
+                  v.addView(tv(row.title, 19f, Color.WHITE), LinearLayout.LayoutParams(0, WRAP, 1f))
+                  if (row.value != null) {
+                      val vt = tv("", 18f, cfg.accent, "sans-serif-medium")
+                      v.addView(vt, LinearLayout.LayoutParams(WRAP, WRAP))
+                      valueViews.add(row to vt)
+                  }
+                  v.setOnClickListener { row.onOk(); refreshValues() }
+                  v.setOnKeyListener { _, code, ev ->
+                      if (ev.action == KeyEvent.ACTION_DOWN) {
+                          if (code == KeyEvent.KEYCODE_DPAD_LEFT && row.onLeft != null) {
+                              row.onLeft.invoke(); refreshValues(); return@setOnKeyListener true
+                          }
+                          if (code == KeyEvent.KEYCODE_DPAD_RIGHT && row.onRight != null) {
+                              row.onRight.invoke(); refreshValues(); return@setOnKeyListener true
+                          }
+                      }
+                      false
+                  }
+                  return v
+              }
+
+              private fun refreshValues() {
+                  for ((r, t) in valueViews) {
+                      val txt = r.value?.invoke() ?: ""
+                      t.text = if (r.onLeft != null) "‹  $txt  ›" else txt
+                  }
+              }
+
+              private fun showOverlay(title: String, rows: List<Row>) {
+                  prevFocus = currentFocus
+                  overlayTitle.text = title
+                  overlayList.removeAllViews()
+                  valueViews.clear()
+                  for (r in rows) {
+                      overlayList.addView(buildRow(r), LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = s(6) })
+                  }
+                  refreshValues()
+                  val lp = scroll.layoutParams
+                  lp.height = minOf(rows.size * s(60), s(330))
+                  scroll.layoutParams = lp
+                  scroll.scrollTo(0, 0)
+                  content.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                  overlayOpen = true
+                  overlay.visibility = View.VISIBLE
+                  overlay.alpha = 0f
+                  overlay.animate().alpha(1f).setDuration(160).start()
+                  content.animate().alpha(0.25f).setDuration(160).start()
+                  overlayList.post { overlayList.getChildAt(0)?.requestFocus() }
+              }
+
+              private fun closeOverlay() {
+                  if (!overlayOpen) return
+                  overlayOpen = false
+                  overlay.animate().alpha(0f).setDuration(140).withEndAction {
+                      if (!overlayOpen) overlay.visibility = View.GONE
+                  }.start()
+                  content.animate().alpha(1f).setDuration(160).start()
+                  content.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+                  val target = prevFocus
+                  if (target != null && target.isAttachedToWindow) target.requestFocus() else gear.requestFocus()
+              }
+
+              // ------------------------------------------------------------------ tile adapter
+
+              inner class TileAdapter : RecyclerView.Adapter<TileAdapter.VH>() {
+                  inner class VH(val v: TileView) : RecyclerView.ViewHolder(v)
+
+                  override fun getItemCount() = apps.size + 1
 
                   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-                      val ctx = parent.context
-                      val card = LinearLayout(ctx).apply {
-                          orientation = LinearLayout.VERTICAL
-                          isFocusable = true
-                          isClickable = true
-                          layoutParams = ViewGroup.MarginLayoutParams(MATCH, WRAP).apply {
-                              setMargins(dp(10), dp(10), dp(10), dp(10))
-                          }
-                          setPadding(dp(6), dp(6), dp(6), dp(6))
-                      }
-                      val box = FrameLayout(ctx).apply { clipToOutline = true }
-                      val img = ImageView(ctx)
-                      box.addView(img, FrameLayout.LayoutParams(MATCH, MATCH))
-                      card.addView(box, LinearLayout.LayoutParams(MATCH, dp(110)))
-                      val label = TextView(ctx).apply {
-                          textSize = 15f
-                          maxLines = 1
-                          ellipsize = TextUtils.TruncateAt.END
-                          gravity = Gravity.CENTER
-                          setPadding(0, dp(8), 0, dp(4))
-                      }
-                      card.addView(label)
-                      card.setOnFocusChangeListener { v, f ->
-                          val s = if (f) 1.12f else 1f
-                          spring(v, DynamicAnimation.SCALE_X, s)
-                          spring(v, DynamicAnimation.SCALE_Y, s)
-                          spring(v, DynamicAnimation.TRANSLATION_Y, if (f) -dp(6).toFloat() else 0f)
-                          label.setTextColor(if (f) theme.accent else Color.WHITE)
-                      }
-                      return VH(card, box, img, label)
+                      val v = TileView(parent.context, u)
+                      v.layoutParams = RecyclerView.LayoutParams(WRAP, WRAP)
+                      return VH(v)
                   }
 
                   override fun onBindViewHolder(h: VH, pos: Int) {
-                      val app = items[pos]
-                      h.card.background = StateListDrawable().apply {
-                          addState(intArrayOf(android.R.attr.state_focused), pill(theme.surface, theme.accent, 16))
-                          addState(intArrayOf(), GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(0) })
-                      }
-                      h.box.background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(theme.surface) }
-                      if (app.banner) {
-                          h.img.scaleType = ImageView.ScaleType.CENTER_CROP
-                          h.img.setPadding(0, 0, 0, 0)
+                      val v = h.v
+                      v.accent = cfg.accent
+                      v.focusMs = (180f / cfg.speed).toLong()
+                      if (pos < apps.size) {
+                          val a = apps[pos]
+                          v.isAdd = false
+                          v.icon = a.icon
+                          v.label = a.label
+                          v.setOnClickListener { launch(a.pkg) }
+                          v.setOnLongClickListener { appMenu(pos); true }
                       } else {
-                          val p = dp(28)
-                          h.img.scaleType = ImageView.ScaleType.FIT_CENTER
-                          h.img.setPadding(p, p / 2, p, p / 2)
+                          v.isAdd = true
+                          v.icon = null
+                          v.label = "Add app"
+                          v.setOnClickListener { openPicker() }
+                          v.setOnLongClickListener(null)
+                          v.isLongClickable = false
                       }
-                      h.img.setImageDrawable(app.icon)
-                      h.label.text = app.label
-                      h.label.setTextColor(if (h.card.isFocused) theme.accent else Color.WHITE)
-                      h.card.setOnClickListener { launch(app) }
-                      h.card.setOnLongClickListener { appInfo(app); true }
                   }
-
-                  override fun getItemCount() = items.size
               }
           }
-          END_OF_FILE_9
+          END_OF_FILE_11
+          base64 -d app/mytv.jks.b64 > app/mytv.jks
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: TvLauncher-apk
+          name: MyTV-apk
           path: app/build/outputs/apk/debug/app-debug.apk
