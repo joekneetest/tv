@@ -213,7 +213,8 @@ jobs:
                       0xFF4DA3FF.toInt(), 0xFFFFFFFF.toInt(), 0xFF2DD4BF.toInt(), 0xFF8B7CFF.toInt(),
                       0xFFFF6B9D.toInt(), 0xFFFFA54D.toInt(), 0xFF5BE37D.toInt()
                   )
-                  val WALL_NAMES = listOf("Flow", "Deep", "Black", "Photo (online)")
+                  val WALL_NAMES = listOf("Flow", "Aurora", "Particles", "Waves", "Deep", "Black", "Photo (online)")
+                  val GAPS = listOf(-6, 0, 8)
                   val SPEED_NAMES = listOf("Slow", "Normal", "Fast")
                   val SPEEDS = listOf(0.5f, 1f, 1.7f)
                   val SIZES = listOf(150 to 88, 176 to 104, 200 to 118)
@@ -230,7 +231,12 @@ jobs:
               var art by IntPref(prefs, "art", 0)
               var names by IntPref(prefs, "names", 0)
               // look
-              var wall by IntPref(prefs, "wall", 0)
+              var wall by IntPref(prefs, "wall2", 0)
+              var wallDim by IntPref(prefs, "walldim", 1)
+              var tileStyle by IntPref(prefs, "tilestyle", 0)
+              var gap by IntPref(prefs, "gap", 1)
+              var logoOn by IntPref(prefs, "logoon", 1)
+              var weatherUnit by IntPref(prefs, "wunit", 0)
               var accentIndex by IntPref(prefs, "accent", 0)
               var zoom by IntPref(prefs, "zoom", 1)
               var glow by IntPref(prefs, "glow", 1)
@@ -334,11 +340,15 @@ jobs:
           import android.graphics.RadialGradient
           import android.graphics.Shader
           import android.view.View
+          import kotlin.math.PI
           import kotlin.math.cos
           import kotlin.math.max
           import kotlin.math.sin
 
-          /** Wallpaper. mode: 0 Flow (drifting curves), 1 Deep (glow only), 2 Black, 3 Photo (online). lite = no animation. */
+          /**
+           * Wallpaper. mode: 0 Flow, 1 Aurora, 2 Particles, 3 Waves, 4 Deep, 5 Black, 6 Photo (online).
+           * Modes 0-3 are animated (unless lite = true). dim: 0 none, 1 light, 2 dark.
+           */
           class FlowBackground(ctx: Context) : View(ctx) {
 
               var mode = 0
@@ -346,6 +356,10 @@ jobs:
               var speed = 1f
               var lite = false
                   set(v) { field = v; invalidate() }
+              var dim = 1
+                  set(v) { field = v; invalidate() }
+              var accent: Int = 0xFF4DA3FF.toInt()
+                  set(v) { field = v; rebuild(); invalidate() }
               var photo: Bitmap? = null
                   set(v) { field = v; rebuildPhoto(); invalidate() }
 
@@ -354,15 +368,39 @@ jobs:
               private val photoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
               private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
               private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+              private val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val wave = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val blobPaint = Paint(Paint.ANTI_ALIAS_FLAG)
               private val path = Path()
+              private val m = Matrix()
               private var baseShader: LinearGradient? = null
               private var glowShaderA: RadialGradient? = null
               private var glowShaderB: RadialGradient? = null
               private var lineShader: LinearGradient? = null
               private var scrimShader: LinearGradient? = null
               private var photoShader: BitmapShader? = null
+              private var blobA: RadialGradient? = null
+              private var blobB: RadialGradient? = null
+              private var blobR = 0f
               private var tt = 0f
               private var lastNs = 0L
+
+              private val n = 40
+              private val px = FloatArray(n)
+              private val py = FloatArray(n)
+              private val ps = FloatArray(n)
+              private val pr = FloatArray(n)
+              private val pa = IntArray(n)
+
+              init {
+                  val rnd = java.util.Random(7)
+                  for (i in 0 until n) {
+                      px[i] = rnd.nextFloat(); py[i] = rnd.nextFloat()
+                      ps[i] = 0.02f + rnd.nextFloat() * 0.05f
+                      pr[i] = 1.5f + rnd.nextFloat() * 4f
+                      pa[i] = 40 + rnd.nextInt(110)
+                  }
+              }
 
               override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
                   super.onSizeChanged(w, h, ow, oh)
@@ -377,7 +415,16 @@ jobs:
                       floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP
                   )
                   scrimShader = LinearGradient(0f, 0f, 0f, fh, 0x8C000000.toInt(), 0xE0000000.toInt(), Shader.TileMode.CLAMP)
+                  rebuild()
                   rebuildPhoto()
+              }
+
+              private fun rebuild() {
+                  if (width == 0 || height == 0) return
+                  blobR = max(width, height) * 0.5f
+                  val second = blend(accent, 0xFF8B7CFF.toInt(), 0.6f)
+                  blobA = RadialGradient(0f, 0f, blobR, withAlpha(accent, 0x66), withAlpha(accent, 0), Shader.TileMode.CLAMP)
+                  blobB = RadialGradient(0f, 0f, blobR, withAlpha(second, 0x55), withAlpha(second, 0), Shader.TileMode.CLAMP)
               }
 
               private fun rebuildPhoto() {
@@ -385,62 +432,114 @@ jobs:
                   if (b == null || width == 0 || height == 0) { photoShader = null; return }
                   val sh = BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
                   val sc = max(width.toFloat() / b.width, height.toFloat() / b.height)
-                  val m = Matrix()
-                  m.setScale(sc, sc)
-                  m.postTranslate((width - b.width * sc) / 2f, (height - b.height * sc) / 2f)
-                  sh.setLocalMatrix(m)
+                  val mm = Matrix()
+                  mm.setScale(sc, sc)
+                  mm.postTranslate((width - b.width * sc) / 2f, (height - b.height * sc) / 2f)
+                  sh.setLocalMatrix(mm)
                   photoShader = sh
+              }
+
+              private fun blob(c: Canvas, s: RadialGradient?, x: Float, y: Float) {
+                  if (s == null) return
+                  m.setTranslate(x, y)
+                  s.setLocalMatrix(m)
+                  blobPaint.shader = s
+                  c.drawRect(x - blobR, y - blobR, x + blobR, y + blobR, blobPaint)
               }
 
               override fun onDraw(c: Canvas) {
                   val w = width.toFloat()
                   val h = height.toFloat()
                   if (w == 0f) return
-                  if (mode == 2) { c.drawColor(0xFF000000.toInt()); return }
-
-                  val ph = photoShader
-                  if (mode == 3 && ph != null) {
-                      photoPaint.shader = ph
-                      c.drawRect(0f, 0f, w, h, photoPaint)
-                      fill.shader = scrimShader
-                      c.drawRect(0f, 0f, w, h, fill)
-                      return
-                  }
+                  if (mode == 5) { c.drawColor(0xFF000000.toInt()); return }
 
                   val now = System.nanoTime()
                   val dt = if (lastNs == 0L) 0f else ((now - lastNs) / 1e9f).coerceIn(0f, 0.1f)
                   lastNs = now
                   tt += dt * speed
 
-                  fill.shader = baseShader
-                  c.drawRect(0f, 0f, w, h, fill)
-                  glowFill.shader = glowShaderA
-                  c.drawRect(0f, 0f, w, h, glowFill)
-                  glowFill.shader = glowShaderB
-                  c.drawRect(0f, 0f, w, h, glowFill)
-
-                  if (mode == 0) {
-                      val u = w / 960f
-                      line.shader = lineShader
-                      halo.shader = lineShader
-                      for (i in 0 until 6) {
-                          val p = tt * 0.18f + i * 0.85f
-                          val by = h * (0.28f + 0.09f * i)
-                          path.reset()
-                          path.moveTo(-0.05f * w, by + h * 0.06f * sin(p))
-                          path.cubicTo(
-                              w * 0.30f, by - h * 0.30f + h * 0.10f * sin(p * 0.8f + i),
-                              w * 0.66f, by + h * 0.32f + h * 0.10f * cos(p * 0.7f),
-                              1.05f * w, by + h * 0.05f * sin(p * 1.3f)
-                          )
-                          halo.strokeWidth = 5f * u
-                          halo.alpha = 12
-                          c.drawPath(path, halo)
-                          line.strokeWidth = 1.3f * u
-                          line.alpha = 40 + i * 12
-                          c.drawPath(path, line)
+                  val ph = photoShader
+                  if (mode == 6 && ph != null) {
+                      photoPaint.shader = ph
+                      c.drawRect(0f, 0f, w, h, photoPaint)
+                      fill.shader = scrimShader
+                      c.drawRect(0f, 0f, w, h, fill)
+                  } else {
+                      fill.shader = baseShader
+                      c.drawRect(0f, 0f, w, h, fill)
+                      glowFill.shader = glowShaderA
+                      c.drawRect(0f, 0f, w, h, glowFill)
+                      glowFill.shader = glowShaderB
+                      c.drawRect(0f, 0f, w, h, glowFill)
+                      when (mode) {
+                          0 -> drawFlow(c, w, h)
+                          1 -> {
+                              blob(c, blobA, w * (0.30f + 0.25f * sin(tt * 0.35f)), h * (0.40f + 0.25f * cos(tt * 0.27f)))
+                              blob(c, blobB, w * (0.70f + 0.22f * cos(tt * 0.31f)), h * (0.65f + 0.22f * sin(tt * 0.40f)))
+                          }
+                          2 -> drawParticles(c, w, h, dt)
+                          3 -> drawWaves(c, w, h)
+                          else -> {}
                       }
-                      if (!lite) postInvalidateOnAnimation()
+                  }
+                  if (dim > 0) {
+                      fill.shader = null
+                      fill.color = if (dim == 1) 0x50000000 else 0x99000000.toInt()
+                      c.drawRect(0f, 0f, w, h, fill)
+                  }
+                  if (!lite && mode in 0..3) postInvalidateOnAnimation()
+              }
+
+              private fun drawFlow(c: Canvas, w: Float, h: Float) {
+                  val u = w / 960f
+                  line.shader = lineShader
+                  halo.shader = lineShader
+                  for (i in 0 until 6) {
+                      val p = tt * 0.18f + i * 0.85f
+                      val by = h * (0.28f + 0.09f * i)
+                      path.reset()
+                      path.moveTo(-0.05f * w, by + h * 0.06f * sin(p))
+                      path.cubicTo(
+                          w * 0.30f, by - h * 0.30f + h * 0.10f * sin(p * 0.8f + i),
+                          w * 0.66f, by + h * 0.32f + h * 0.10f * cos(p * 0.7f),
+                          1.05f * w, by + h * 0.05f * sin(p * 1.3f)
+                      )
+                      halo.strokeWidth = 5f * u
+                      halo.alpha = 12
+                      c.drawPath(path, halo)
+                      line.strokeWidth = 1.3f * u
+                      line.alpha = 40 + i * 12
+                      c.drawPath(path, line)
+                  }
+              }
+
+              private fun drawParticles(c: Canvas, w: Float, h: Float, dt: Float) {
+                  val u = w / 960f
+                  for (i in 0 until n) {
+                      py[i] -= ps[i] * dt * speed
+                      if (py[i] < -0.05f) { py[i] = 1.05f; px[i] = (px[i] + 0.37f) % 1f }
+                      val x = (px[i] + 0.015f * sin(tt * 0.6f + i)) * w
+                      dot.color = withAlpha(accent, pa[i])
+                      c.drawCircle(x, py[i] * h, pr[i] * u, dot)
+                  }
+              }
+
+              private fun drawWaves(c: Canvas, w: Float, h: Float) {
+                  for (l in 0 until 3) {
+                      path.reset()
+                      path.moveTo(0f, h)
+                      val yb = h * (0.72f + 0.07f * l)
+                      val amp = h * (0.035f + 0.01f * l)
+                      val k = (2f * PI.toFloat()) / (w * (0.55f - 0.1f * l))
+                      var x = 0f
+                      while (x <= w + 24f) {
+                          path.lineTo(x, yb + amp * sin(x * k + tt * (0.6f + 0.25f * l) + l * 1.7f))
+                          x += 24f
+                      }
+                      path.lineTo(w, h)
+                      path.close()
+                      wave.color = withAlpha(accent, 22 + l * 14)
+                      c.drawPath(path, wave)
                   }
               }
           }
@@ -457,6 +556,9 @@ jobs:
           import android.graphics.LinearGradient
           import android.graphics.Matrix
           import android.graphics.Paint
+          import android.graphics.PorterDuff
+          import android.graphics.PorterDuffXfermode
+          import android.graphics.Path
           import android.graphics.Rect
           import android.graphics.RectF
           import android.graphics.Shader
@@ -469,9 +571,8 @@ jobs:
           import androidx.dynamicanimation.animation.DynamicAnimation
           import androidx.dynamicanimation.animation.SpringAnimation
           import androidx.dynamicanimation.animation.SpringForce
-          import kotlin.math.cos
+          import androidx.recyclerview.widget.RecyclerView
           import kotlin.math.max
-          import kotlin.math.sin
 
           fun blend(a: Int, b: Int, t: Float): Int {
               fun ch(s: Int) = (((a shr s) and 0xFF) * (1f - t) + ((b shr s) and 0xFF) * t).toInt()
@@ -497,6 +598,8 @@ jobs:
               var radius = 22f
                   set(v) { field = v; invalidate() }
               var glowOn = true
+              var look = 0   // 0 glass, 1 flat, 2 outline
+                  set(v) { field = v; invalidate() }
               var zoom = 0.08f
               var focusMs: Long = 180L
 
@@ -553,7 +656,11 @@ jobs:
                           c.drawRoundRect(rect, r, r, glowPaint)
                       }
                   }
-                  fillPaint.color = blend(0xFF0E121A.toInt(), 0xFF1A2130.toInt(), p)
+                  fillPaint.color = when (look) {
+                      1 -> blend(0xFF11151D.toInt(), 0xFF222B3D.toInt(), p)
+                      2 -> blend(0x0DFFFFFF, 0x26FFFFFF, p)
+                      else -> blend(0xFF0E121A.toInt(), 0xFF1A2130.toInt(), p)
+                  }
                   c.drawRoundRect(rect, r, r, fillPaint)
                   overlayShader?.let {
                       overlayPaint.shader = it
@@ -563,9 +670,12 @@ jobs:
 
               protected fun drawTop(c: Canvas) {
                   val r = rr
-                  shinePaint.shader = shine
-                  c.drawRoundRect(rect, r, r, shinePaint)
-                  borderPaint.color = blend(0x33FFFFFF, accent, p)
+                  if (look == 0) {
+                      shinePaint.shader = shine
+                      c.drawRoundRect(rect, r, r, shinePaint)
+                  }
+                  val idle = when (look) { 1 -> 0x00FFFFFF; 2 -> 0x73FFFFFF; else -> 0x33FFFFFF }
+                  borderPaint.color = blend(idle, accent, p)
                   borderPaint.strokeWidth = (1f + 1.4f * p) * u
                   c.drawRoundRect(rect, r, r, borderPaint)
               }
@@ -827,15 +937,82 @@ jobs:
                       }
                       c.drawCircle(cx, by, w * 0.05f, fill)
                   } else {
-                      stroke.strokeWidth = w * 0.07f
-                      c.drawCircle(cx, cy, w * 0.19f, stroke)
-                      stroke.strokeWidth = w * 0.09f
-                      for (a in 0 until 8) {
-                          val ang = Math.toRadians(a * 45.0)
-                          val ca = cos(ang).toFloat()
-                          val sa = sin(ang).toFloat()
-                          c.drawLine(cx + ca * w * 0.27f, cy + sa * w * 0.27f, cx + ca * w * 0.36f, cy + sa * w * 0.36f, stroke)
+                      // "sliders" settings icon: three lines with knobs
+                      stroke.strokeWidth = w * 0.065f
+                      val x0 = cx - w * 0.28f
+                      val x1 = cx + w * 0.28f
+                      val ys = floatArrayOf(cy - w * 0.22f, cy, cy + w * 0.22f)
+                      val ks = floatArrayOf(0.40f, 0.60f, 0.35f)
+                      for (k in 0 until 3) {
+                          c.drawLine(x0, ys[k], x1, ys[k], stroke)
+                          val kx = x0 + (x1 - x0) * ks[k]
+                          fill.color = 0xFF0B0F16.toInt()
+                          c.drawCircle(kx, ys[k], w * 0.105f, fill)
+                          stroke.strokeWidth = w * 0.06f
+                          c.drawCircle(kx, ys[k], w * 0.085f, stroke)
+                          stroke.strokeWidth = w * 0.065f
                       }
+                  }
+              }
+          }
+
+
+          /** Horizontal list that fades out at an edge when there is more to scroll, with chevrons and a thin position bar. */
+          class FadeRecycler(ctx: Context, private val u: Float) : RecyclerView(ctx) {
+
+              var accent: Int = 0xFF4DA3FF.toInt()
+              private val fadePaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT) }
+              private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+              private var rightFade: LinearGradient? = null
+              private var leftFade: LinearGradient? = null
+
+              override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+                  super.onSizeChanged(w, h, ow, oh)
+                  val l = 56f * u
+                  rightFade = LinearGradient(w - l, 0f, w.toFloat(), 0f, 0x00000000, 0xFF000000.toInt(), Shader.TileMode.CLAMP)
+                  leftFade = LinearGradient(0f, 0f, l, 0f, 0xFF000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+              }
+
+              override fun dispatchDraw(c: Canvas) {
+                  val more = canScrollHorizontally(1)
+                  val back = canScrollHorizontally(-1)
+                  if (!more && !back) { super.dispatchDraw(c); return }
+                  val w = width.toFloat()
+                  val h = height.toFloat()
+                  val l = 56f * u
+                  val sc = c.saveLayer(0f, 0f, w, h, null)
+                  super.dispatchDraw(c)
+                  if (more) { fadePaint.shader = rightFade; c.drawRect(w - l, 0f, w, h, fadePaint) }
+                  if (back) { fadePaint.shader = leftFade; c.drawRect(0f, 0f, l, h, fadePaint) }
+                  c.restoreToCount(sc)
+
+                  line.color = 0xE6FFFFFF.toInt()
+                  line.strokeWidth = 2.6f * u
+                  val cy = h / 2f - 6f * u
+                  if (more) {
+                      val x = w - 14f * u
+                      c.drawLine(x - 5f * u, cy - 10f * u, x + 3f * u, cy, line)
+                      c.drawLine(x + 3f * u, cy, x - 5f * u, cy + 10f * u, line)
+                  }
+                  if (back) {
+                      val x = 14f * u
+                      c.drawLine(x + 5f * u, cy - 10f * u, x - 3f * u, cy, line)
+                      c.drawLine(x - 3f * u, cy, x + 5f * u, cy + 10f * u, line)
+                  }
+                  val range = computeHorizontalScrollRange().toFloat()
+                  val extent = computeHorizontalScrollExtent().toFloat()
+                  val off = computeHorizontalScrollOffset().toFloat()
+                  if (range > extent) {
+                      val x0 = 24f * u
+                      val x1 = w - 24f * u
+                      val y = h - 5f * u
+                      line.strokeWidth = 3f * u
+                      line.color = 0x33FFFFFF
+                      c.drawLine(x0, y, x1, y, line)
+                      val tl = max(24f * u, (x1 - x0) * extent / range)
+                      val tx = x0 + ((x1 - x0) - tl) * (off / (range - extent))
+                      line.color = accent
+                      c.drawLine(tx, y, tx + tl, y, line)
                   }
               }
           }
@@ -865,6 +1042,8 @@ jobs:
           import android.os.Handler
           import android.os.Looper
           import android.provider.Settings
+          import android.text.TextUtils
+          import android.util.Log
           import android.util.TypedValue
           import android.view.Gravity
           import android.view.KeyEvent
@@ -872,10 +1051,12 @@ jobs:
           import android.view.ViewGroup
           import android.widget.EditText
           import android.widget.FrameLayout
+          import android.widget.HorizontalScrollView
           import android.widget.ImageView
           import android.widget.LinearLayout
           import android.widget.ScrollView
           import android.widget.TextView
+          import android.widget.Toast
           import androidx.recyclerview.widget.LinearLayoutManager
           import androidx.recyclerview.widget.RecyclerView
           import java.io.File
@@ -895,7 +1076,7 @@ jobs:
               var onlineWide = false
           }
 
-          /** One line in the settings / menu / picker overlay. */
+          /** One line in the settings / menu / picker overlay. section = small grey caption (not focusable). */
           class Row(
               val title: String,
               val icon: Drawable? = null,
@@ -923,16 +1104,20 @@ jobs:
               private lateinit var bigClock: TextView
               private lateinit var bigDate: TextView
               private lateinit var rowBox: LinearLayout
-              private lateinit var tiles: RecyclerView
+              private lateinit var tiles: FadeRecycler
               private lateinit var recent: RecentCard
               private lateinit var overlay: FrameLayout
+              private lateinit var panel: LinearLayout
               private lateinit var overlayTitle: TextView
+              private lateinit var tabScroll: HorizontalScrollView
               private lateinit var overlayList: LinearLayout
               private lateinit var scroll: ScrollView
+              private val tabViews = mutableListOf<TextView>()
+              private val tabNames = listOf("Layout", "Look", "Header", "Apps", "TV", "More")
 
               private var apps: List<AppEntry> = emptyList()
               private val adapter = TileAdapter()
-              private var builtSize = -1
+              private var builtKey = -1
               private var loading = false
               private var fetching = false
               private var photoLoading = false
@@ -940,6 +1125,8 @@ jobs:
               private var weatherText = ""
               private var weatherAt = 0L
               private var overlayOpen = false
+              private var settingsOpen = false
+              private var currentTab = 0
               private var prevFocus: View? = null
               private val valueViews = mutableListOf<Pair<Row, TextView>>()
 
@@ -976,10 +1163,13 @@ jobs:
                   includeFontPadding = false
               }
 
+              private fun toast(t: String) = Toast.makeText(this, t, Toast.LENGTH_SHORT).show()
+
               // ------------------------------------------------------------------ setup
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
+                  installCrashLogger()
                   cfg = Config(this)
                   u = resources.displayMetrics.widthPixels / 960f
                   requestHighRefresh()
@@ -1003,15 +1193,16 @@ jobs:
                   weatherView = tv("", 19f, 0xE6FFFFFF.toInt())
                   weatherView.visibility = View.GONE
                   clockView = tv("", 19f, 0xE6FFFFFF.toInt())
-                  wifi = IconView(this, 0, u, false)
+                  wifi = IconView(this, 0, u, true)
+                  wifi.setOnClickListener { openSys(Settings.ACTION_WIFI_SETTINGS) }
                   gear = IconView(this, 1, u, true)
-                  gear.setOnClickListener { openSettings() }
+                  gear.setOnClickListener { openSettings(currentTab, 0) }
                   header.addView(logo)
                   header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
                   header.addView(weatherView, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = s(20) })
                   header.addView(clockView)
-                  header.addView(wifi, LinearLayout.LayoutParams(s(24), s(24)).apply { marginStart = s(20) })
-                  header.addView(gear, LinearLayout.LayoutParams(s(36), s(36)).apply { marginStart = s(14) })
+                  header.addView(wifi, LinearLayout.LayoutParams(s(34), s(34)).apply { marginStart = s(14) })
+                  header.addView(gear, LinearLayout.LayoutParams(s(36), s(36)).apply { marginStart = s(8) })
                   content.addView(header, LinearLayout.LayoutParams(MATCH, WRAP))
 
                   val middle = FrameLayout(this).apply { clipChildren = false }
@@ -1028,15 +1219,15 @@ jobs:
                       orientation = LinearLayout.HORIZONTAL
                       gravity = Gravity.CENTER_VERTICAL
                       clipChildren = false
-                      setPadding(s(38), 0, s(38), 0)
+                      setPadding(s(24), 0, s(38), 0)
                   }
-                  tiles = RecyclerView(this).apply {
+                  tiles = FadeRecycler(this, u).apply {
                       layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
                       itemAnimator = null
-                      clipToPadding = false
-                      clipChildren = false
+                      clipToPadding = false           // children are still clipped to the list, so they never slide under the recent card
                       overScrollMode = View.OVER_SCROLL_NEVER
                       setItemViewCacheSize(10)
+                      setPadding(s(14), s(14), s(14), s(20))
                   }
                   rowBox.addView(tiles, LinearLayout.LayoutParams(0, WRAP, 1f))
                   middle.addView(rowBox, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM))
@@ -1047,27 +1238,28 @@ jobs:
                   setContentView(root)
                   applyConfig()
                   if (apps.isNotEmpty()) { firstFocusDone = true; focusTile(0) }
+                  showCrashIfAny()
               }
 
-              private fun buildOverlay(root: FrameLayout) {
-                  overlay = FrameLayout(this).apply {
-                      visibility = View.GONE
-                      isClickable = true
-                      setBackgroundColor(0xB3000000.toInt())
+              private fun installCrashLogger() {
+                  val prev = Thread.getDefaultUncaughtExceptionHandler()
+                  Thread.setDefaultUncaughtExceptionHandler { t, e ->
+                      try { File(filesDir, "crash.txt").writeText(Log.getStackTraceString(e)) } catch (x: Exception) { }
+                      prev?.uncaughtException(t, e)
                   }
-                  val panel = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      setPadding(s(28), s(24), s(28), s(22))
-                      background = roundRect(0xF2101420.toInt(), 0x33FFFFFF, 26)
-                  }
-                  overlayTitle = tv("", 22f, Color.WHITE)
-                  panel.addView(overlayTitle, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = s(14) })
-                  scroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false }
-                  overlayList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-                  scroll.addView(overlayList)
-                  panel.addView(scroll, LinearLayout.LayoutParams(MATCH, s(300)))
-                  overlay.addView(panel, FrameLayout.LayoutParams(s(600), WRAP, Gravity.CENTER))
-                  root.addView(overlay, FrameLayout.LayoutParams(MATCH, MATCH))
+              }
+
+              private fun showCrashIfAny() {
+                  val file = File(filesDir, "crash.txt")
+                  if (!file.exists()) return
+                  val txt = try { file.readText().take(1400) } catch (e: Exception) { "" }
+                  file.delete()
+                  if (txt.isEmpty()) return
+                  AlertDialog.Builder(this)
+                      .setTitle("FlowyOs closed unexpectedly last time")
+                      .setMessage(txt)
+                      .setPositiveButton("OK", null)
+                      .show()
               }
 
               private fun requestHighRefresh() {
@@ -1091,18 +1283,22 @@ jobs:
                   g.radius = Config.RADII[cfg.corners.coerceIn(0, 2)]
                   g.glowOn = cfg.glow == 1 && !lite
                   g.zoom = Config.ZOOMS[cfg.zoom.coerceIn(0, 2)]
+                  g.look = cfg.tileStyle.coerceIn(0, 2)
                   g.focusMs = (180f / cfg.speed / (if (lite) 1.5f else 1f)).toLong()
               }
 
-              /** Pushes every setting into the views. Safe to call any time. */
+              /** Pushes every setting into the views. Safe to call any time; this is what makes the preview live. */
               private fun applyConfig() {
                   bg.mode = cfg.wall
                   bg.speed = cfg.speed
                   bg.lite = cfg.effects == 1
-                  if (cfg.wall == 3 && bg.photo == null) loadWallpaper(false)
+                  bg.dim = cfg.wallDim
+                  bg.accent = cfg.accent
+                  if (cfg.wall == 6 && bg.photo == null) loadWallpaper(false)
 
                   face = Typeface.create(Config.FONTS[cfg.font.coerceIn(0, 3)], Typeface.NORMAL)
                   logo.text = cfg.logo
+                  logo.visibility = if (cfg.logoOn == 1) View.VISIBLE else View.GONE
                   for (t in listOf(logo, clockView, weatherView, bigClock, bigDate)) t.typeface = face
                   bigDate.visibility = if (cfg.showDate == 1) View.VISIBLE else View.GONE
                   bigBox.visibility = if (cfg.clockStyle == 1) View.VISIBLE else View.GONE
@@ -1110,17 +1306,20 @@ jobs:
                   wifi.visibility = if (cfg.wifiOn == 1) View.VISIBLE else View.GONE
                   weatherView.visibility = if (cfg.weatherOn == 1 && weatherText.isNotEmpty()) View.VISIBLE else View.GONE
                   gear.accent = cfg.accent
+                  wifi.accent = cfg.accent
+                  tiles.accent = cfg.accent
 
                   val lp = rowBox.layoutParams as FrameLayout.LayoutParams
                   when (cfg.pos) {
                       0 -> { lp.gravity = Gravity.CENTER_VERTICAL; lp.bottomMargin = s(40) }
-                      1 -> { lp.gravity = Gravity.BOTTOM; lp.bottomMargin = s(96) }
-                      else -> { lp.gravity = Gravity.BOTTOM; lp.bottomMargin = s(28) }
+                      1 -> { lp.gravity = Gravity.BOTTOM; lp.bottomMargin = s(84) }
+                      else -> { lp.gravity = Gravity.BOTTOM; lp.bottomMargin = s(24) }
                   }
                   rowBox.layoutParams = lp
 
-                  if (builtSize != cfg.tileSize) {
-                      builtSize = cfg.tileSize
+                  val key = cfg.tileSize * 10 + cfg.gap
+                  if (builtKey != key) {
+                      builtKey = key
                       rebuildRecent()
                       tiles.adapter = adapter
                   } else {
@@ -1131,6 +1330,7 @@ jobs:
                   updateRecent()
                   fetchWeather()
                   fetchOnline()
+                  styleTabs()
                   handler.removeCallbacks(tick)
                   handler.post(tick)
               }
@@ -1140,7 +1340,7 @@ jobs:
                   val dims = Config.SIZES[cfg.tileSize.coerceIn(0, 2)]
                   recent = RecentCard(this, u, (dims.first * 1.4f).toInt(), dims.second)
                   recent.setOnClickListener { cfg.recentPkg?.let { launch(it) } }
-                  rowBox.addView(recent, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = s(6) })
+                  rowBox.addView(recent, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = s(4) })
               }
 
               // ------------------------------------------------------------------ lifecycle
@@ -1168,7 +1368,7 @@ jobs:
               override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
                   when (keyCode) {
                       KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> {
-                          if (overlayOpen) closeOverlay() else openSettings()
+                          if (overlayOpen) closeOverlay() else openSettings(currentTab, 0)
                           return true
                       }
                       KeyEvent.KEYCODE_ESCAPE -> {
@@ -1303,8 +1503,9 @@ jobs:
                   val now = System.currentTimeMillis()
                   if (weatherText.isNotEmpty() && now - weatherAt < 30 * 60 * 1000L) return
                   weatherAt = now
+                  val q = when (cfg.weatherUnit) { 1 -> "m&"; 2 -> "u&"; else -> "" }
                   Thread {
-                      val t = Net.text("https://wttr.in/?format=%25t")?.trim()?.removePrefix("+") ?: ""
+                      val t = Net.text("https://wttr.in/?${q}format=%25t")?.trim()?.removePrefix("+") ?: ""
                       if (t.isNotEmpty() && t.length <= 8) {
                           runOnUiThread {
                               weatherText = t
@@ -1335,6 +1536,14 @@ jobs:
                   } catch (e: ActivityNotFoundException) { }
               }
 
+              private fun openSys(action: String) {
+                  try {
+                      startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                  } catch (e: Exception) {
+                      toast("Not available on this TV")
+                  }
+              }
+
               private fun prompt(title: String, initial: String, onOk: (String) -> Unit) {
                   val et = EditText(this)
                   et.setText(initial)
@@ -1348,12 +1557,14 @@ jobs:
                       .show()
               }
 
+              // ---- hold-OK menu on a tile
+
               private fun appMenu(i: Int) {
                   val a = apps.getOrNull(i) ?: return
                   val rows = mutableListOf(
                       Row("Move left") { move(i, -1) },
                       Row("Move right") { move(i, 1) },
-                      Row("Remove from home") { remove(i) },
+                      Row("Remove from hot bar") { remove(i) },
                       Row("Set image URL") {
                           closeOverlay()
                           prompt("Image URL (wide 16:9 pictures fill the tile)", cfg.img(a.pkg) ?: "https://") { url ->
@@ -1398,7 +1609,27 @@ jobs:
                   focusTile(i)
               }
 
-              private fun openPicker() {
+              // ---- hot bar editing from Settings > Apps (the home screen behind updates live)
+
+              private fun settingsMove(i: Int, d: Int) {
+                  val j = i + d
+                  if (j < 0 || j >= apps.size) return
+                  val m = apps.toMutableList()
+                  val t = m[i]; m[i] = m[j]; m[j] = t
+                  apps = m
+                  savePins()
+                  adapter.notifyDataSetChanged()
+                  renderTab(3, j + 2)
+              }
+
+              private fun settingsRemove(i: Int) {
+                  apps = apps.filterIndexed { k, _ -> k != i }
+                  savePins()
+                  adapter.notifyDataSetChanged()
+                  renderTab(3, minOf(i + 2, apps.size + 1))
+              }
+
+              private fun openPicker(fromSettings: Boolean) {
                   Thread {
                       val pm = packageManager
                       fun q(cat: String) = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(cat), 0)
@@ -1410,7 +1641,7 @@ jobs:
                           .mapNotNull { pkg ->
                               try {
                                   val e = AppEntry(pkg, pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString())
-                                  loadArt(e, pm)
+                                  e.icon = pm.getApplicationIcon(pkg)
                                   e
                               } catch (ex: Exception) { null }
                           }
@@ -1421,12 +1652,15 @@ jobs:
                                   apps = apps + e
                                   savePins()
                                   adapter.notifyDataSetChanged()
-                                  closeOverlay()
-                                  focusTile(apps.size - 1)
-                                  fetchOnline()
+                                  Thread {
+                                      try { loadArt(e, pm) } catch (ex: Exception) { }
+                                      runOnUiThread { adapter.notifyDataSetChanged(); fetchOnline() }
+                                  }.start()
+                                  if (fromSettings) openSettings(3, apps.size + 1)
+                                  else { closeOverlay(); focusTile(apps.size - 1) }
                               }
                           }
-                      runOnUiThread { showOverlay("Add app", rows) }
+                      runOnUiThread { showOverlay("Add app to the hot bar", rows) }
                   }.start()
               }
 
@@ -1478,7 +1712,7 @@ jobs:
                   }
               } catch (e: Exception) { true }
 
-              // ------------------------------------------------------------------ overlay (settings, menus, picker)
+              // ------------------------------------------------------------------ settings (tabs + live preview)
 
               private fun choice(title: String, names: List<String>, get: () -> Int, set: (Int) -> Unit): Row {
                   val n = names.size
@@ -1486,96 +1720,291 @@ jobs:
                   return Row(title, value = { names[get().coerceIn(0, n - 1)] }, onLeft = { step(-1) }, onRight = { step(1) }, onOk = { step(1) })
               }
 
-              private fun section(t: String) = Row(t, section = true, onOk = {})
+              private fun caption(t: String) = Row(t, section = true, onOk = {})
 
-              private fun openSettings() {
-                  val offOn = listOf("Off", "On")
-                  val hideShow = listOf("Hide", "Show")
-                  showOverlay("Settings", listOf(
-                      section("LAYOUT"),
-                      choice("Row position", listOf("Center", "Lower", "Bottom"), { cfg.pos }, { cfg.pos = it }),
-                      choice("Tile size", listOf("Small", "Medium", "Large"), { cfg.tileSize }, { cfg.tileSize = it }),
-                      choice("Corners", listOf("Square", "Rounded", "Pill"), { cfg.corners }, { cfg.corners = it }),
-                      choice("Tile art", listOf("Smart (banners)", "Online logos", "Icons only"), { cfg.art }, { cfg.art = it }),
-                      choice("App names", listOf("On focus", "Always", "Never"), { cfg.names }, { cfg.names = it }),
-                      choice("Recent activity", hideShow, { cfg.recentOn }, { cfg.recentOn = it }),
-                      section("LOOK"),
-                      choice("Wallpaper", Config.WALL_NAMES, { cfg.wall }, { cfg.wall = it }),
-                      choice("Accent color", Config.ACCENT_NAMES, { cfg.accentIndex }, { cfg.accentIndex = it }),
-                      choice("Font", Config.FONT_NAMES, { cfg.font }, { cfg.font = it }),
-                      choice("Focus zoom", listOf("Off", "Small", "Large"), { cfg.zoom }, { cfg.zoom = it }),
-                      choice("Glow", offOn, { cfg.glow }, { cfg.glow = it }),
-                      choice("Animation speed", Config.SPEED_NAMES, { cfg.speedIndex }, { cfg.speedIndex = it }),
-                      choice("Effects (Lite = fastest)", listOf("Full", "Lite"), { cfg.effects }, { cfg.effects = it }),
-                      section("HEADER"),
-                      Row("Logo text", value = { cfg.logo }, onOk = {
-                          closeOverlay()
-                          prompt("Logo text", cfg.logo) { if (it.isNotEmpty()) { cfg.logo = it; applyConfig() } }
-                      }),
-                      choice("Clock style", listOf("Small (header)", "Big"), { cfg.clockStyle }, { cfg.clockStyle = it }),
-                      choice("Clock format", listOf("24-hour", "12-hour"), { cfg.clock12 }, { cfg.clock12 = it }),
-                      choice("Date", hideShow, { cfg.showDate }, { cfg.showDate = it }),
-                      choice("Wi-Fi icon", hideShow, { cfg.wifiOn }, { cfg.wifiOn = it }),
-                      choice("Weather", offOn, { cfg.weatherOn }, { cfg.weatherOn = it }),
-                      section("ADVANCED"),
-                      Row("Wallpaper photo URL", value = { cfg.wallUrl.removePrefix("https://").take(24) }, onOk = {
-                          closeOverlay()
-                          prompt("Wallpaper photo URL", cfg.wallUrl) {
-                              if (it.length > 8) { cfg.wallUrl = it; bg.photo = null; loadWallpaper(true) }
-                          }
-                      }),
-                      Row("Refresh online art and photo") {
-                          Net.clearCache(this)
-                          apps.forEach { it.online = null; it.onlineAmbient = null }
-                          adapter.notifyDataSetChanged()
-                          if (cfg.wall == 3) loadWallpaper(true)
-                          fetchOnline()
-                          closeOverlay()
-                      },
-                      Row("Reset apps to default") {
-                          cfg.pinned = null
-                          closeOverlay()
-                          loadApps(true)
-                      },
-                      Row("Reset everything") {
-                          cfg.prefs.edit().clear().apply()
-                          bg.photo = null
-                          apps = emptyList()
-                          closeOverlay()
-                          builtSize = -1
-                          applyConfig()
-                          loadApps(true)
+              private fun layoutRows(): List<Row> = listOf(
+                  choice("Row position", listOf("Center", "Lower", "Bottom"), { cfg.pos }, { cfg.pos = it }),
+                  choice("Tile size", listOf("Small", "Medium", "Large"), { cfg.tileSize }, { cfg.tileSize = it }),
+                  choice("Tile gap", listOf("Tight", "Normal", "Wide"), { cfg.gap }, { cfg.gap = it }),
+                  choice("Corners", listOf("Square", "Rounded", "Pill"), { cfg.corners }, { cfg.corners = it }),
+                  choice("Tile art", listOf("Smart", "Online logos", "Icons only"), { cfg.art }, { cfg.art = it }),
+                  choice("App names", listOf("On focus", "Always", "Never"), { cfg.names }, { cfg.names = it }),
+                  choice("Recent card", listOf("Hide", "Show"), { cfg.recentOn }, { cfg.recentOn = it })
+              )
+
+              private fun lookRows(): List<Row> = listOf(
+                  choice("Wallpaper", Config.WALL_NAMES, { cfg.wall }, { cfg.wall = it }),
+                  choice("Wallpaper dim", listOf("None", "Light", "Dark"), { cfg.wallDim }, { cfg.wallDim = it }),
+                  choice("Accent color", Config.ACCENT_NAMES, { cfg.accentIndex }, { cfg.accentIndex = it }),
+                  choice("Tile style", listOf("Glass", "Flat", "Outline"), { cfg.tileStyle }, { cfg.tileStyle = it }),
+                  choice("Font", Config.FONT_NAMES, { cfg.font }, { cfg.font = it }),
+                  choice("Focus zoom", listOf("Off", "Small", "Large"), { cfg.zoom }, { cfg.zoom = it }),
+                  choice("Glow", listOf("Off", "On"), { cfg.glow }, { cfg.glow = it }),
+                  choice("Animation speed", Config.SPEED_NAMES, { cfg.speedIndex }, { cfg.speedIndex = it }),
+                  choice("Effects", listOf("Full", "Lite (fastest)"), { cfg.effects }, { cfg.effects = it }),
+                  Row("Photo wallpaper URL", value = { cfg.wallUrl.removePrefix("https://").take(18) }, onOk = {
+                      closeOverlay()
+                      prompt("Photo wallpaper URL", cfg.wallUrl) {
+                          if (it.length > 8) { cfg.wallUrl = it; bg.photo = null; loadWallpaper(true) }
                       }
-                  ))
+                  })
+              )
+
+              private fun headerRows(): List<Row> = listOf(
+                  choice("Logo", listOf("Hide", "Show"), { cfg.logoOn }, { cfg.logoOn = it }),
+                  Row("Logo text", value = { cfg.logo }, onOk = {
+                      closeOverlay()
+                      prompt("Logo text", cfg.logo) { if (it.isNotEmpty()) { cfg.logo = it; applyConfig() } }
+                  }),
+                  choice("Clock style", listOf("Small", "Big"), { cfg.clockStyle }, { cfg.clockStyle = it }),
+                  choice("Clock format", listOf("24-hour", "12-hour"), { cfg.clock12 }, { cfg.clock12 = it }),
+                  choice("Date", listOf("Hide", "Show"), { cfg.showDate }, { cfg.showDate = it }),
+                  choice("Wi-Fi icon", listOf("Hide", "Show"), { cfg.wifiOn }, { cfg.wifiOn = it }),
+                  choice("Weather", listOf("Off", "On"), { cfg.weatherOn }, { cfg.weatherOn = it }),
+                  choice("Weather units", listOf("Auto", "Celsius", "Fahrenheit"), { cfg.weatherUnit },
+                      { cfg.weatherUnit = it; weatherText = ""; weatherAt = 0L })
+              )
+
+              private fun appsRows(): List<Row> {
+                  val rows = mutableListOf<Row>()
+                  rows.add(caption("‹ › move       OK remove"))
+                  rows.add(Row("Add app…") { openPicker(true) })
+                  apps.forEachIndexed { i, a ->
+                      rows.add(Row(a.label, icon = a.icon, value = { "${i + 1} / ${apps.size}" },
+                          onLeft = { settingsMove(i, -1) }, onRight = { settingsMove(i, 1) }, onOk = { settingsRemove(i) }))
+                  }
+                  if (apps.isEmpty()) rows.add(caption("The hot bar is empty"))
+                  return rows
+              }
+
+              private fun tvRows(): List<Row> = listOf(
+                  Row("Wi-Fi & Internet", value = { if (online()) "Connected" else "Not connected" }) { openSys(Settings.ACTION_WIFI_SETTINGS) },
+                  Row("Network") { openSys(Settings.ACTION_WIRELESS_SETTINGS) },
+                  Row("Bluetooth & remotes") { openSys(Settings.ACTION_BLUETOOTH_SETTINGS) },
+                  Row("Display & picture") { openSys(Settings.ACTION_DISPLAY_SETTINGS) },
+                  Row("Sound") { openSys(Settings.ACTION_SOUND_SETTINGS) },
+                  Row("Date & time") { openSys(Settings.ACTION_DATE_SETTINGS) },
+                  Row("Language") { openSys(Settings.ACTION_LOCALE_SETTINGS) },
+                  Row("Keyboard") { openSys(Settings.ACTION_INPUT_METHOD_SETTINGS) },
+                  Row("Accessibility") { openSys(Settings.ACTION_ACCESSIBILITY_SETTINGS) },
+                  Row("Storage") { openSys(Settings.ACTION_INTERNAL_STORAGE_SETTINGS) },
+                  Row("All apps") { openSys(Settings.ACTION_APPLICATION_SETTINGS) },
+                  Row("Privacy") { openSys(Settings.ACTION_PRIVACY_SETTINGS) },
+                  Row("Developer options") { openSys(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) },
+                  Row("All TV settings") { openSys(Settings.ACTION_SETTINGS) }
+              )
+
+              private fun moreRows(): List<Row> = listOf(
+                  Row("Choose default home app") { openSys(Settings.ACTION_HOME_SETTINGS) },
+                  Row("Refresh online art and photo") {
+                      Net.clearCache(this)
+                      apps.forEach { it.online = null; it.onlineAmbient = null }
+                      adapter.notifyDataSetChanged()
+                      if (cfg.wall == 6) loadWallpaper(true)
+                      fetchOnline()
+                      toast("Refreshing…")
+                  },
+                  Row("Reset hot bar to default") {
+                      cfg.pinned = null
+                      loadApps(true)
+                      toast("Hot bar reset")
+                  },
+                  Row("Reset all settings") {
+                      cfg.prefs.edit().clear().apply()
+                      bg.photo = null
+                      apps = emptyList()
+                      builtKey = -1
+                      applyConfig()
+                      loadApps(true)
+                      renderTab(5, 0)
+                  },
+                  Row("About", value = { "FlowyOs 1.0" }) { }
+              )
+
+              private fun tabRows(i: Int): List<Row> = when (i) {
+                  0 -> layoutRows()
+                  1 -> lookRows()
+                  2 -> headerRows()
+                  3 -> appsRows()
+                  4 -> tvRows()
+                  else -> moreRows()
+              }
+
+              private fun styleTabs() {
+                  tabViews.forEachIndexed { i, t ->
+                      t.setTextColor(if (i == currentTab) cfg.accent else 0xB3FFFFFF.toInt())
+                  }
+              }
+
+              private fun renderTab(i: Int, focusChild: Int) {
+                  currentTab = i
+                  styleTabs()
+                  overlayList.removeAllViews()
+                  valueViews.clear()
+                  for (r in tabRows(i)) {
+                      overlayList.addView(buildRow(r), LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = s(5) })
+                  }
+                  refreshValues()
+                  scroll.scrollTo(0, 0)
+                  if (focusChild >= 0) overlayList.post { focusFrom(focusChild) }
+              }
+
+              private fun focusFrom(start: Int) {
+                  val n = overlayList.childCount
+                  if (n == 0) return
+                  var i = start.coerceIn(0, n - 1)
+                  while (i < n) {
+                      val c = overlayList.getChildAt(i)
+                      if (c.isFocusable) { c.requestFocus(); return }
+                      i++
+                  }
+                  i = start.coerceIn(0, n - 1)
+                  while (i >= 0) {
+                      val c = overlayList.getChildAt(i)
+                      if (c.isFocusable) { c.requestFocus(); return }
+                      i--
+                  }
+              }
+
+              private fun openSettings(tab: Int, focusChild: Int) {
+                  if (!overlayOpen) prevFocus = currentFocus
+                  settingsOpen = true
+                  overlayTitle.text = "Settings"
+                  tabScroll.visibility = View.VISIBLE
+                  val lp = FrameLayout.LayoutParams(s(410), MATCH, Gravity.END).apply {
+                      topMargin = s(16); bottomMargin = s(16); rightMargin = s(16)
+                  }
+                  panel.layoutParams = lp
+                  val sl = LinearLayout.LayoutParams(MATCH, 0, 1f)
+                  scroll.layoutParams = sl
+                  overlay.setBackgroundColor(0)
+                  renderTab(tab, focusChild)
+                  beginOverlay(true)
+              }
+
+              private fun showOverlay(title: String, rows: List<Row>) {
+                  if (!overlayOpen) prevFocus = currentFocus
+                  settingsOpen = false
+                  overlayTitle.text = title
+                  tabScroll.visibility = View.GONE
+                  panel.layoutParams = FrameLayout.LayoutParams(s(600), WRAP, Gravity.CENTER)
+                  overlay.setBackgroundColor(0xB3000000.toInt())
+                  overlayList.removeAllViews()
+                  valueViews.clear()
+                  for (r in rows) {
+                      overlayList.addView(buildRow(r), LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = s(5) })
+                  }
+                  refreshValues()
+                  scroll.layoutParams = LinearLayout.LayoutParams(MATCH, minOf(rows.size * s(56), s(330)))
+                  scroll.scrollTo(0, 0)
+                  beginOverlay(false)
+                  overlayList.post { focusFrom(0) }
+              }
+
+              private fun beginOverlay(preview: Boolean) {
+                  content.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                  overlayOpen = true
+                  overlay.visibility = View.VISIBLE
+                  overlay.alpha = 0f
+                  overlay.animate().alpha(1f).setDuration(160).start()
+                  if (preview) {
+                      // The whole home screen shrinks to the left so every change is visible while you edit it.
+                      content.pivotX = 0f
+                      content.pivotY = content.height / 2f
+                      content.animate().alpha(1f).scaleX(0.53f).scaleY(0.53f).translationX(s(8).toFloat()).setDuration(220).start()
+                  } else {
+                      content.animate().alpha(0.25f).scaleX(1f).scaleY(1f).translationX(0f).setDuration(160).start()
+                  }
+              }
+
+              private fun closeOverlay() {
+                  if (!overlayOpen) return
+                  overlayOpen = false
+                  settingsOpen = false
+                  overlay.animate().alpha(0f).setDuration(140).withEndAction {
+                      if (!overlayOpen) overlay.visibility = View.GONE
+                  }.start()
+                  content.animate().alpha(1f).scaleX(1f).scaleY(1f).translationX(0f).setDuration(200).start()
+                  content.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+                  val target = prevFocus
+                  if (target != null && target.isAttachedToWindow) target.requestFocus() else gear.requestFocus()
+              }
+
+              private fun buildOverlay(root: FrameLayout) {
+                  overlay = FrameLayout(this).apply {
+                      visibility = View.GONE
+                      isClickable = true
+                  }
+                  panel = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      setPadding(s(20), s(18), s(20), s(16))
+                      background = roundRect(0xF0101420.toInt(), 0x33FFFFFF, 24)
+                  }
+                  overlayTitle = tv("", 21f, Color.WHITE)
+                  panel.addView(overlayTitle, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = s(10); marginStart = s(4) })
+
+                  tabScroll = HorizontalScrollView(this).apply {
+                      isHorizontalScrollBarEnabled = false
+                      visibility = View.GONE
+                  }
+                  val tabBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                  tabNames.forEachIndexed { i, name ->
+                      val t = tv(name, 15f, 0xB3FFFFFF.toInt())
+                      t.isFocusable = true
+                      t.isClickable = true
+                      t.setPadding(s(12), s(8), s(12), s(8))
+                      t.background = StateListDrawable().apply {
+                          addState(intArrayOf(android.R.attr.state_focused), roundRect(0x26FFFFFF, 0x80FFFFFF.toInt(), 14))
+                          addState(intArrayOf(), roundRect(0x00000000, 0x00000000, 14))
+                      }
+                      t.setOnFocusChangeListener { _, focused ->
+                          if (focused && i != currentTab) renderTab(i, -1)
+                      }
+                      t.setOnClickListener { focusFrom(0) }
+                      tabViews.add(t)
+                      tabBar.addView(t, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = s(2) })
+                  }
+                  tabScroll.addView(tabBar)
+                  panel.addView(tabScroll, LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = s(8) })
+
+                  scroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false }
+                  overlayList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                  scroll.addView(overlayList)
+                  panel.addView(scroll, LinearLayout.LayoutParams(MATCH, s(300)))
+                  overlay.addView(panel, FrameLayout.LayoutParams(s(600), WRAP, Gravity.CENTER))
+                  root.addView(overlay, FrameLayout.LayoutParams(MATCH, MATCH))
               }
 
               private fun buildRow(row: Row): View {
                   if (row.section) {
-                      return tv(row.title, 12f, 0x80FFFFFF.toInt()).apply {
-                          letterSpacing = 0.14f
-                          setPadding(s(6), s(12), 0, s(4))
-                      }
+                      return tv(row.title, 13f, 0x99FFFFFF.toInt()).apply { setPadding(s(8), s(8), 0, s(6)) }
                   }
                   val v = LinearLayout(this).apply {
                       orientation = LinearLayout.HORIZONTAL
                       gravity = Gravity.CENTER_VERTICAL
                       isFocusable = true
                       isClickable = true
-                      setPadding(s(18), s(12), s(18), s(12))
+                      setPadding(s(14), s(10), s(14), s(10))
                       background = StateListDrawable().apply {
-                          addState(intArrayOf(android.R.attr.state_focused), roundRect(0x26FFFFFF, cfg.accent, 14))
+                          addState(intArrayOf(android.R.attr.state_focused), roundRect(0x2EFFFFFF, 0x99FFFFFF.toInt(), 14))
                           addState(intArrayOf(), roundRect(0x00000000, 0x00000000, 14))
                       }
                   }
                   row.icon?.let {
                       val iv = ImageView(this)
                       iv.setImageDrawable(it)
-                      v.addView(iv, LinearLayout.LayoutParams(s(34), s(34)).apply { marginEnd = s(16) })
+                      v.addView(iv, LinearLayout.LayoutParams(s(30), s(30)).apply { marginEnd = s(12) })
                   }
-                  v.addView(tv(row.title, 19f, Color.WHITE).apply { typeface = face }, LinearLayout.LayoutParams(0, WRAP, 1f))
+                  val title = tv(row.title, 17f, Color.WHITE).apply {
+                      typeface = face
+                      maxLines = 1
+                      ellipsize = TextUtils.TruncateAt.END
+                  }
+                  v.addView(title, LinearLayout.LayoutParams(0, WRAP, 1f))
                   if (row.value != null) {
-                      val vt = tv("", 18f, cfg.accent)
-                      v.addView(vt, LinearLayout.LayoutParams(WRAP, WRAP))
+                      val vt = tv("", 15f, cfg.accent)
+                      vt.maxLines = 1
+                      v.addView(vt, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = s(8) })
                       valueViews.add(row to vt)
                   }
                   v.setOnClickListener { row.onOk(); refreshValues() }
@@ -1597,46 +2026,8 @@ jobs:
                   for ((r, t) in valueViews) {
                       val txt = r.value?.invoke() ?: ""
                       t.text = if (r.onLeft != null) "‹  $txt  ›" else txt
+                      t.setTextColor(cfg.accent)
                   }
-              }
-
-              private fun showOverlay(title: String, rows: List<Row>) {
-                  prevFocus = currentFocus
-                  overlayTitle.text = title
-                  overlayList.removeAllViews()
-                  valueViews.clear()
-                  for (r in rows) {
-                      overlayList.addView(buildRow(r), LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = s(6) })
-                  }
-                  refreshValues()
-                  val lp = scroll.layoutParams
-                  lp.height = minOf(rows.size * s(60), s(340))
-                  scroll.layoutParams = lp
-                  scroll.scrollTo(0, 0)
-                  content.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-                  overlayOpen = true
-                  overlay.visibility = View.VISIBLE
-                  overlay.alpha = 0f
-                  overlay.animate().alpha(1f).setDuration(160).start()
-                  content.animate().alpha(0.25f).setDuration(160).start()
-                  overlayList.post {
-                      for (i in 0 until overlayList.childCount) {
-                          val c = overlayList.getChildAt(i)
-                          if (c.isFocusable) { c.requestFocus(); break }
-                      }
-                  }
-              }
-
-              private fun closeOverlay() {
-                  if (!overlayOpen) return
-                  overlayOpen = false
-                  overlay.animate().alpha(0f).setDuration(140).withEndAction {
-                      if (!overlayOpen) overlay.visibility = View.GONE
-                  }.start()
-                  content.animate().alpha(1f).setDuration(160).start()
-                  content.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-                  val target = prevFocus
-                  if (target != null && target.isAttachedToWindow) target.requestFocus() else gear.requestFocus()
               }
 
               // ------------------------------------------------------------------ tile adapter
@@ -1662,7 +2053,8 @@ jobs:
                   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
                       val dims = Config.SIZES[cfg.tileSize.coerceIn(0, 2)]
                       val v = TileView(parent.context, u, dims.first, dims.second)
-                      v.layoutParams = RecyclerView.LayoutParams(WRAP, WRAP)
+                      val g = s(Config.GAPS[cfg.gap.coerceIn(0, 2)])
+                      v.layoutParams = RecyclerView.LayoutParams(WRAP, WRAP).apply { setMargins(g, 0, g, 0) }
                       return VH(v)
                   }
 
@@ -1682,7 +2074,7 @@ jobs:
                           v.isAdd = true
                           v.label = "Add app"
                           v.setArt(null, null, null)
-                          v.setOnClickListener { openPicker() }
+                          v.setOnClickListener { openPicker(false) }
                           v.setOnLongClickListener(null)
                           v.isLongClickable = false
                       }
